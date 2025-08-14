@@ -1,0 +1,39 @@
+RewriteEngine On
+
+# Redirigir todas las peticiones a Django excepto archivos estáticos y media
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/static/
+RewriteCond %{REQUEST_URI} !^/media/
+RewriteRule ^(.*)$ /django/$1 [L]
+
+# Configuración para archivos estáticos
+<Location "/static/">
+    Require all granted
+    ExpiresActive On
+    ExpiresDefault "access plus 1 month"
+</Location>
+
+# Configuración para archivos media
+<Location "/media/">
+    Require all granted
+    ExpiresActive On
+    ExpiresDefault "access plus 1 month"
+</Location>
+
+# Configuración para Django
+<Location "/django/">
+    Require all granted
+    ProxyPass http://127.0.0.1:8000/
+    ProxyPassReverse http://127.0.0.1:8000/
+</Location>
+
+# Headers de seguridad
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options DENY
+Header always set X-XSS-Protection "1; mode=block"
+
+# Configuración CORS
+Header always set Access-Control-Allow-Origin "*"
+Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+Header always set Access-Control-Allow-Headers "Content-Type, Authorization"

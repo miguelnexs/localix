@@ -1,0 +1,14 @@
+# Configuración para las plantillas de issues
+# https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository
+
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentación
+    url: https://github.com/miguelnexs/localix/wiki
+    about: Revisa la documentación antes de crear un issue
+  - name: 💬 Discusiones
+    url: https://github.com/miguelnexs/localix/discussions
+    about: Preguntas generales y discusiones
+  - name: 📞 Soporte
+    url: https://github.com/miguelnexs/localix/blob/main/.github/SUPPORT.md
+    about: Guía de soporte y contacto

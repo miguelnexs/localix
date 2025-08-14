@@ -1,0 +1,28 @@
+# Estos propietarios serán los responsables por el código en el repositorio.
+# Son los únicos que pueden aprobar cambios en el código, y pueden ser
+# notificados para revisar pull requests.
+
+# Propietario principal del proyecto
+* @miguelnexs
+
+# Backend específico
+/Localix-backend/ @miguelnexs
+
+# Frontend específico
+/Localix-dashboard/ @miguelnexs
+
+# Documentación
+/docs/ @miguelnexs
+README.md @miguelnexs
+CONTRIBUTING.md @miguelnexs
+
+# Configuración de GitHub
+/.github/ @miguelnexs
+
+# Scripts de despliegue
+deploy.sh @miguelnexs
+deploy.bat @miguelnexs
+
+# Archivos de configuración
+.gitignore @miguelnexs
+LICENSE @miguelnexs
