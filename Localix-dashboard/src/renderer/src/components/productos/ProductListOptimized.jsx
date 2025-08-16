@@ -18,6 +18,10 @@ import ErrorBoundary from './ErrorBoundary';
 import ProductColorsDisplay from './ProductColorsDisplay';
 import SmartProductSearch from './SmartProductSearch';
 
+// Componentes UI estandarizados
+import DataTable from '../ui/DataTable';
+import ActionButtons from '../ui/ActionButtons';
+
 // Hooks y utilidades optimizadas
 import { useToast } from '../../hooks/useToast';
 import { useDeleteConfirmation } from '../../hooks/useDeleteConfirmation';
@@ -27,43 +31,31 @@ import { formatPrice } from '../../utils/formatters';
 import { RESOURCE_URL } from '../../api/apiConfig';
 import { useLoadingState, InlineLoading, ErrorState, CardSkeleton } from '../ui/LoadingComponents';
 
-// Componentes memoizados para mejor rendimiento
-const ProductRow = React.memo(({ 
-  product, 
-  index, 
-  onView, 
-  onEdit, 
-  onDelete, 
-  onRetryEdit,
-  isLast,
-  lastProductElementRef 
-}) => {
+// Función para obtener URL de imagen
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return null;
+  if (imagePath.startsWith('http')) return imagePath;
+  return `${RESOURCE_URL}${imagePath}`;
+};
+
+// Configuración de columnas para la tabla estandarizada
+const getProductColumns = (onView, onEdit, onDelete, onRetryEdit) => {
   const navigate = useNavigate();
   
-  const handleEdit = useCallback(() => {
+  const handleEdit = (product) => {
     if (product.slug && product.slug !== 'producto' && product.slug !== ':1') {
       navigate(`/product/edit/${product.slug}`);
     } else {
       onRetryEdit(product.id);
     }
-  }, [product, navigate, onRetryEdit]);
+  };
 
-  const handleView = useCallback(() => {
-    onView(product);
-  }, [product, onView]);
-
-  const handleDelete = useCallback(() => {
-    onDelete(product);
-  }, [product, onDelete]);
-
-  const ref = isLast ? lastProductElementRef : null;
-
-  return (
-    <tr 
-      ref={ref}
-      className="hover:bg-theme-background transition-colors duration-150"
-    >
-      <td className="px-4 py-3 text-sm text-theme-text">
+  return [
+    {
+      key: 'producto',
+      label: 'Producto',
+      sortable: true,
+      render: (product) => (
         <div className="flex items-center space-x-3">
           <div className="flex-shrink-0">
             {product.imagen_principal_url ? (
@@ -88,17 +80,25 @@ const ProductRow = React.memo(({
             </p>
           </div>
         </div>
-      </td>
-      
-      <td className="px-4 py-3 text-sm text-theme-text">
-        {formatPrice(product.precio)}
-      </td>
-      
-      <td className="px-4 py-3 text-sm text-theme-text">
-        <ProductStatusChip status={product.estado} />
-      </td>
-      
-      <td className="px-4 py-3 text-sm text-theme-text">
+      )
+    },
+    {
+      key: 'precio',
+      label: 'Precio',
+      sortable: true,
+      render: (product) => formatPrice(product.precio)
+    },
+    {
+      key: 'estado',
+      label: 'Estado',
+      sortable: true,
+      render: (product) => <ProductStatusChip status={product.estado} />
+    },
+    {
+      key: 'stock',
+      label: 'Stock',
+      sortable: true,
+      render: (product) => (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
           product.stock > 0 
             ? 'bg-green-100 text-green-800' 
@@ -106,44 +106,36 @@ const ProductRow = React.memo(({
         }`}>
           {product.stock} unidades
         </span>
-      </td>
-      
-      <td className="px-4 py-3 text-sm text-theme-text">
-        {product.categoria?.nombre || 'Sin categoría'}
-      </td>
-      
-      <td className="px-4 py-3 text-sm text-theme-textSecondary">
-        {new Date(product.fecha_creacion).toLocaleDateString()}
-      </td>
-      
-      <td className="px-4 py-3 text-sm font-medium">
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={handleView}
-            className="text-blue-600 hover:text-blue-900 transition-colors"
-            title="Ver detalles"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleEdit}
-            className="text-green-600 hover:text-green-900 transition-colors"
-            title="Editar"
-          >
-            <Edit className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleDelete}
-            className="text-red-600 hover:text-red-900 transition-colors"
-            title="Eliminar"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-});
+      )
+    },
+    {
+      key: 'categoria',
+      label: 'Categoría',
+      sortable: true,
+      render: (product) => product.categoria?.nombre || 'Sin categoría'
+    },
+    {
+      key: 'fecha_creacion',
+      label: 'Fecha',
+      sortable: true,
+      render: (product) => new Date(product.fecha_creacion).toLocaleDateString()
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      sortable: false,
+      render: (product) => (
+        <ActionButtons
+          onView={() => onView(product)}
+          onEdit={() => handleEdit(product)}
+          onDelete={() => onDelete(product)}
+          size="sm"
+          variant="compact"
+        />
+      )
+    }
+  ];
+};
 
 const ProductListOptimized = () => {
   const navigate = useNavigate();
@@ -350,76 +342,18 @@ const ProductListOptimized = () => {
         </div>
       </div>
 
-      {/* Tabla de productos */}
-      <div className="bg-theme-surface rounded-lg border border-theme-border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-theme-border">
-            <thead className="bg-theme-background">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">
-                  Producto
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">
-                  <button
-                    onClick={() => handleSort('precio')}
-                    className="flex items-center space-x-1 hover:text-theme-textSecondary transition-colors"
-                  >
-                    <span>Precio</span>
-                    {sortConfig.key === 'precio' ? (
-                      sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
-                    ) : <ArrowUpDown className="w-4 h-4" />}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">
-                  Estado
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">
-                  Stock
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">
-                  Categoría
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">
-                  <button
-                    onClick={() => handleSort('fecha_creacion')}
-                    className="flex items-center space-x-1 hover:text-theme-textSecondary transition-colors"
-                  >
-                    <span>Fecha</span>
-                    {sortConfig.key === 'fecha_creacion' ? (
-                      sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
-                    ) : <ArrowUpDown className="w-4 h-4" />}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-theme-surface divide-y divide-theme-border">
-              {products.map((product, index) => (
-                <ProductRow
-                  key={product.id}
-                  product={product}
-                  index={index}
-                  onView={handleViewProduct}
-                  onEdit={() => navigate(`/product/edit/${product.slug}`)}
-                  onDelete={handleDeleteProduct}
-                  onRetryEdit={retryEditProduct}
-                  isLast={index === products.length - 1}
-                  lastProductElementRef={lastProductElementRef}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Loading indicator para infinite scroll */}
-        {pagination.loading && (
-          <div className="p-4 text-center">
-            <InlineLoading message="Cargando más productos..." />
-          </div>
-        )}
-      </div>
+      {/* Tabla de productos estandarizada */}
+      <DataTable
+        columns={getProductColumns(handleViewProduct, null, handleDeleteProduct, retryEditProduct)}
+        data={products}
+        sortConfig={sortConfig}
+        onSort={handleSort}
+        loading={pagination.loading}
+        emptyMessage="No hay productos disponibles"
+        size="md"
+        striped={true}
+        hover={true}
+      />
 
       {/* Diálogo de producto */}
       {ui.openDialog && (

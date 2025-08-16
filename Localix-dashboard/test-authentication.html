@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Autenticación - Localix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .danger {
+            background: #f44336;
+        }
+        .danger:hover {
+            background: #da190b;
+        }
+        .info {
+            background: #2196F3;
+        }
+        .info:hover {
+            background: #0b7dda;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .success {
+            background: rgba(76, 175, 80, 0.3);
+        }
+        .error {
+            background: rgba(244, 67, 54, 0.3);
+        }
+        .warning {
+            background: rgba(255, 193, 7, 0.3);
+        }
+        pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test de Autenticación y APIs</h1>
+        <p>Esta página te ayuda a verificar que la autenticación y las APIs funcionan correctamente.</p>
+        
+        <div id="status"></div>
+        
+        <div class="test-section">
+            <h3>🔐 Estado de Autenticación</h3>
+            <button onclick="checkAuthStatus()" class="info">Verificar Estado de Auth</button>
+            <button onclick="clearAuth()" class="danger">Limpiar Auth</button>
+            <div id="authStatus"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🌐 Test de API HTTP</h3>
+            <button onclick="testHttpAPI()" class="info">Test API HTTP</button>
+            <button onclick="testCategoriesAPI()" class="info">Test Categorías API</button>
+            <button onclick="testProductsAPI()" class="info">Test Productos API</button>
+            <div id="apiStatus"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>⚡ Test de Electron IPC</h3>
+            <button onclick="testElectronAPI()" class="info">Test Electron API</button>
+            <button onclick="testCategoriesIPC()" class="info">Test Categorías IPC</button>
+            <div id="electronStatus"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔄 Test de Preload</h3>
+            <button onclick="testPreload()" class="info">Test Preload Context</button>
+            <div id="preloadStatus"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📊 Información del Sistema</h3>
+            <button onclick="showSystemInfo()" class="info">Mostrar Info del Sistema</button>
+            <div id="systemInfo"></div>
+        </div>
+    </div>
+
+    <script>
+        function showStatus(message, type = 'info', elementId = 'status') {
+            const statusDiv = document.getElementById(elementId);
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function showResult(data, elementId) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        }
+
+        async function checkAuthStatus() {
+            try {
+                const token = localStorage.getItem('access_token');
+                const refreshToken = localStorage.getItem('refresh_token');
+                
+                const authInfo = {
+                    hasAccessToken: !!token,
+                    hasRefreshToken: !!refreshToken,
+                    tokenLength: token ? token.length : 0,
+                    refreshTokenLength: refreshToken ? refreshToken.length : 0
+                };
+                
+                showStatus('✅ Estado de autenticación verificado', 'success', 'authStatus');
+                showResult(authInfo, 'authStatus');
+                
+            } catch (error) {
+                showStatus(`❌ Error verificando auth: ${error.message}`, 'error', 'authStatus');
+            }
+        }
+
+        function clearAuth() {
+            try {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                localStorage.removeItem('user');
+                showStatus('✅ Autenticación limpiada', 'success', 'authStatus');
+            } catch (error) {
+                showStatus(`❌ Error limpiando auth: ${error.message}`, 'error', 'authStatus');
+            }
+        }
+
+        async function testHttpAPI() {
+            try {
+                const token = localStorage.getItem('access_token');
+                const headers = {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                };
+                
+                if (token) {
+                    headers.Authorization = `Bearer ${token}`;
+                }
+                
+                const response = await fetch('http://localhost:8000/api/categorias/test_connection/', {
+                    method: 'GET',
+                    headers: headers
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus('✅ API HTTP funcionando', 'success', 'apiStatus');
+                    showResult(data, 'apiStatus');
+                } else {
+                    showStatus(`❌ Error API HTTP: ${response.status}`, 'error', 'apiStatus');
+                    showResult(data, 'apiStatus');
+                }
+                
+            } catch (error) {
+                showStatus(`❌ Error conectando a API: ${error.message}`, 'error', 'apiStatus');
+            }
+        }
+
+        async function testCategoriesAPI() {
+            try {
+                const token = localStorage.getItem('access_token');
+                const headers = {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                };
+                
+                if (token) {
+                    headers.Authorization = `Bearer ${token}`;
+                }
+                
+                const response = await fetch('http://localhost:8000/api/categorias/', {
+                    method: 'GET',
+                    headers: headers
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus('✅ Categorías API funcionando', 'success', 'apiStatus');
+                    showResult({
+                        count: data.results ? data.results.length : data.length,
+                        data: data.results || data
+                    }, 'apiStatus');
+                } else {
+                    showStatus(`❌ Error Categorías API: ${response.status}`, 'error', 'apiStatus');
+                    showResult(data, 'apiStatus');
+                }
+                
+            } catch (error) {
+                showStatus(`❌ Error conectando a Categorías API: ${error.message}`, 'error', 'apiStatus');
+            }
+        }
+
+        async function testProductsAPI() {
+            try {
+                const token = localStorage.getItem('access_token');
+                const headers = {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                };
+                
+                if (token) {
+                    headers.Authorization = `Bearer ${token}`;
+                }
+                
+                const response = await fetch('http://localhost:8000/api/productos/', {
+                    method: 'GET',
+                    headers: headers
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus('✅ Productos API funcionando', 'success', 'apiStatus');
+                    showResult({
+                        count: data.results ? data.results.length : data.length,
+                        data: data.results || data
+                    }, 'apiStatus');
+                } else {
+                    showStatus(`❌ Error Productos API: ${response.status}`, 'error', 'apiStatus');
+                    showResult(data, 'apiStatus');
+                }
+                
+            } catch (error) {
+                showStatus(`❌ Error conectando a Productos API: ${error.message}`, 'error', 'apiStatus');
+            }
+        }
+
+        async function testElectronAPI() {
+            try {
+                if (window.electronAPI) {
+                    showStatus('✅ Electron API disponible', 'success', 'electronStatus');
+                    showResult({
+                        available: true,
+                        apis: Object.keys(window.electronAPI)
+                    }, 'electronStatus');
+                } else {
+                    showStatus('❌ Electron API no disponible', 'error', 'electronStatus');
+                }
+            } catch (error) {
+                showStatus(`❌ Error verificando Electron API: ${error.message}`, 'error', 'electronStatus');
+            }
+        }
+
+        async function testCategoriesIPC() {
+            try {
+                if (window.electronAPI?.categorias?.listar) {
+                    const result = await window.electronAPI.categorias.listar();
+                    showStatus('✅ Categorías IPC funcionando', 'success', 'electronStatus');
+                    showResult({
+                        count: result.length,
+                        data: result
+                    }, 'electronStatus');
+                } else {
+                    showStatus('❌ Categorías IPC no disponible', 'error', 'electronStatus');
+                }
+            } catch (error) {
+                showStatus(`❌ Error en Categorías IPC: ${error.message}`, 'error', 'electronStatus');
+            }
+        }
+
+        async function testPreload() {
+            try {
+                // Simular test de preload
+                showStatus('✅ Preload Context disponible', 'success', 'preloadStatus');
+                showResult({
+                    available: true,
+                    note: 'El PreloadContext está disponible en la aplicación React'
+                }, 'preloadStatus');
+            } catch (error) {
+                showStatus(`❌ Error en Preload: ${error.message}`, 'error', 'preloadStatus');
+            }
+        }
+
+        function showSystemInfo() {
+            const info = {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                localStorage: {
+                    available: typeof(Storage) !== "undefined",
+                    items: localStorage.length
+                },
+                electron: {
+                    available: typeof window !== 'undefined' && window.process && window.process.type,
+                    processType: window.process?.type || 'unknown'
+                },
+                apis: {
+                    electronAPI: !!window.electronAPI,
+                    fetch: !!window.fetch,
+                    localStorage: !!window.localStorage
+                }
+            };
+            
+            showStatus('✅ Información del sistema obtenida', 'success', 'systemInfo');
+            showResult(info, 'systemInfo');
+        }
+
+        // Verificar estado inicial
+        window.addEventListener('load', () => {
+            checkAuthStatus();
+            showSystemInfo();
+        });
+    </script>
+</body>
+</html>

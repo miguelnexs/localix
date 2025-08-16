@@ -16,7 +16,15 @@ import {
   getHistorialPedido 
 } from '../main/handlers/pedidoHandlers';
 import PedidoDetailModal from '../components/PedidoDetailModal';
-import { jsPDF } from 'jspdf';
+import { generarPDFPedido } from '../utils/pedidoPDFGenerator.js';
+
+
+
+
+
+// Componentes UI estandarizados
+import DataTable from '../components/ui/DataTable';
+import ActionButtons from '../components/ui/ActionButtons';
 
 const OrdersPage = () => {
   const location = useLocation();
@@ -51,6 +59,119 @@ const OrdersPage = () => {
     entregados: 0,
     cancelados: 0
   });
+
+  // Configuración de columnas para la tabla estandarizada
+  const getPedidoColumns = (onView, onEdit, onDelete, onPrint) => [
+    {
+      key: 'pedido',
+      label: 'Pedido',
+      sortable: true,
+      render: (pedido) => (
+        <div className="flex items-center space-x-3">
+          <div className="flex-shrink-0 w-8 h-8">
+            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Package className="w-4 h-4 text-blue-600" />
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-theme-text truncate">
+              {pedido.numero_pedido}
+            </p>
+            <p className="text-xs text-theme-textSecondary truncate">
+              {new Date(pedido.fecha_creacion).toLocaleDateString()}
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'cliente',
+      label: 'Cliente',
+      sortable: true,
+      render: (pedido) => (
+        <div className="flex items-center space-x-2">
+          <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+            <User className="w-3 h-3 text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-theme-text">
+              {pedido.cliente?.nombre || 'Cliente anónimo'}
+            </p>
+            <p className="text-xs text-theme-textSecondary">
+              {pedido.cliente?.telefono || 'Sin teléfono'}
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'estado_pedido',
+      label: 'Estado',
+      sortable: true,
+      render: (pedido) => {
+        const estados = {
+          pendiente: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+          confirmado: { color: 'bg-blue-100 text-blue-800', icon: CheckSquare },
+          en_preparacion: { color: 'bg-orange-100 text-orange-800', icon: Package },
+          enviado: { color: 'bg-purple-100 text-purple-800', icon: Truck },
+          entregado: { color: 'bg-green-100 text-green-800', icon: CheckCircle },
+          cancelado: { color: 'bg-red-100 text-red-800', icon: XSquare }
+        };
+        
+        const estado = estados[pedido.estado_pedido] || estados.pendiente;
+        const IconComponent = estado.icon;
+        
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${estado.color}`}>
+            <IconComponent className="w-3 h-3 mr-1" />
+            {pedido.estado_pedido?.replace('_', ' ').toUpperCase()}
+          </span>
+        );
+      }
+    },
+    {
+      key: 'productos_count',
+      label: 'Productos',
+      sortable: true,
+      render: (pedido) => (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+          {pedido.productos_count || 0} items
+        </span>
+      )
+    },
+    {
+      key: 'total_pedido',
+      label: 'Total',
+      sortable: true,
+      align: 'right',
+      render: (pedido) => (
+        <div className="text-right">
+          <p className="text-sm font-medium text-theme-text">
+            ${parseFloat(pedido.total_pedido || 0).toFixed(2)}
+          </p>
+          <p className="text-xs text-theme-textSecondary">
+            {pedido.estado_pago === 'pagado' ? 'Pagado' : 'Pendiente'}
+          </p>
+        </div>
+      )
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      sortable: false,
+      render: (pedido) => (
+        <ActionButtons
+          onView={() => onView(pedido)}
+          onEdit={() => onEdit(pedido)}
+          onDelete={() => onDelete(pedido)}
+          onPrint={() => onPrint(pedido)}
+          showPrint={true}
+          size="sm"
+          variant="compact"
+        />
+      )
+    }
+  ];
 
   // Datos de ejemplo para demostración
   const pedidosEjemplo = [
@@ -401,149 +522,25 @@ const OrdersPage = () => {
     }
   };
 
-  const handlePrintPedido = (pedido) => {
-    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-    const tienda = {
-      nombre: 'Mi Tienda Ejemplo',
-      direccion: 'Calle Principal 123, Ciudad, País',
-      telefono: '+57 300 123 4567',
-      email: 'contacto@mitienda.com',
-    };
-
-    // Encabezado elegante
-    doc.setFillColor(30, 41, 59); // azul oscuro
-    doc.rect(0, 0, 210, 28, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
-    doc.text(tienda.nombre, 12, 16);
-    doc.setFontSize(11);
-    doc.text(`Dirección: ${tienda.direccion}`, 12, 22);
-    doc.text(`Tel: ${tienda.telefono}  |  Email: ${tienda.email}`, 110, 22);
-
-    // Línea divisoria
-    doc.setDrawColor(30, 41, 59);
-    doc.setLineWidth(1);
-    doc.line(10, 30, 200, 30);
-
-    // Datos del pedido y cliente
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(13);
-    let y = 38;
-    doc.text(`Pedido #: ${pedido.numero_pedido || ''}`, 12, y);
-    doc.text(`Fecha: ${pedido.fecha_creacion ? new Date(pedido.fecha_creacion).toLocaleString() : ''}`, 110, y);
-    y += 7;
-    doc.text(`Cliente: ${pedido.cliente_nombre || (pedido.cliente && pedido.cliente.nombre) || ''}`, 12, y);
-    if (pedido.cliente && pedido.cliente.telefono) doc.text(`Teléfono: ${pedido.cliente.telefono}`, 110, y);
-    y += 7;
-    if (pedido.cliente && pedido.cliente.email) { doc.text(`Email: ${pedido.cliente.email}`, 12, y); y += 7; }
-    if (pedido.cliente && pedido.cliente.direccion) { doc.text(`Dirección: ${pedido.cliente.direccion}`, 12, y); y += 7; }
-    doc.setFontSize(12);
-    doc.text(`Estado: ${pedido.estado_pedido || ''}`, 12, y);
-    doc.text(`Método de pago: ${pedido.metodo_pago || ''}`, 110, y);
-    y += 10;
-
-    // Tabla de productos elegante
-    // Cabecera de la tabla de productos
-    doc.setFontSize(11);
-    doc.setFillColor(226, 232, 240); // gris claro
-    doc.setDrawColor(30, 41, 59);
-    doc.rect(10, y, 190, 9, 'F');
-    doc.rect(10, y, 190, 9); // Borde de cabecera
-    doc.setTextColor(30, 41, 59);
-    doc.text('Nombre', 14, y + 6, { align: 'left' });
-    doc.text('SKU', 60, y + 6, { align: 'center' });
-    doc.text('Color', 90, y + 6, { align: 'center' });
-    doc.text('Cantidad', 120, y + 6, { align: 'center' });
-    doc.text('Precio', 150, y + 6, { align: 'center' });
-    doc.text('Subtotal', 185, y + 6, { align: 'center' });
-    y += 18; // Más espacio después de la cabecera
-    if (pedido.items && pedido.items.length > 0) {
-      let totalGeneral = 0;
-      pedido.items.forEach(item => {
-        const nombreProducto = (item.producto && item.producto.nombre) || item.producto_nombre || 'Producto';
-        const sku = (item.producto && item.producto.sku) || item.sku || '';
-        // Restaurar la lógica original para mostrar el color en la columna de color
-        let color = '';
-        if (item.color) {
-          if (typeof item.color === 'object' && item.color.nombre) {
-            color = item.color.nombre;
-          } else if (typeof item.color === 'string') {
-            color = item.color;
-          }
-        } else if (item.producto) {
-          if (item.producto.variante && (item.producto.variante.color_nombre || item.producto.variante.color)) {
-            color = item.producto.variante.color_nombre || item.producto.variante.color;
-          } else if (item.producto.color_nombre || item.producto.color) {
-            color = item.producto.color_nombre || item.producto.color;
-          }
-        } else if (item.variante && (item.variante.color_nombre || item.variante.color)) {
-          color = item.variante.color_nombre || item.variante.color;
-        } else if (item.color_nombre || item.color) {
-          color = item.color_nombre || item.color;
-        }
-        // Obtener nombre y código hexadecimal del color
-        let colorNombre = item.color_nombre || (item.color && (item.color.nombre || item.color)) || '';
-        let colorHex = '';
-        if (item.color && typeof item.color === 'object') {
-          colorHex = item.color.hex_code || item.color.hex || '';
-        }
-        // Imprimir el nombre del producto en la columna 'Nombre'
-        doc.text(String(nombreProducto), 14, y, { align: 'left' });
-        doc.text(String(sku), 60, y, { align: 'center' });
-        // Mostrar solo el nombre del color en la celda de la columna 'Color', sin círculo unicode
-        doc.text(String(colorNombre), 90, y, { align: 'center' });
-        doc.text(String(item.cantidad || ''), 120, y, { align: 'center' });
-        const precio = Number(item.precio_unitario);
-        const subtotal = Number(item.subtotal);
-        totalGeneral += !isNaN(subtotal) ? subtotal : 0;
-        doc.text(`$${!isNaN(precio) ? precio.toFixed(2) : ''}`, 150, y, { align: 'center' });
-        doc.text(`$${!isNaN(subtotal) ? subtotal.toFixed(2) : ''}`, 185, y, { align: 'center' });
-        y += 12;
-        if (y > 260) { doc.addPage(); y = 20; }
+  const handlePrintPedido = async (pedido) => {
+    try {
+      console.log('🖨️ Iniciando generación de PDF para pedido:', pedido.numero_pedido);
+      
+      // Usar el nuevo generador de PDFs con HTML
+      await generarPDFPedido(pedido, true);
+      
+      toast.success(`PDF del pedido ${pedido.numero_pedido} generado exitosamente`, {
+        position: "top-right",
+        autoClose: 3000,
       });
-      // Total general al final de la tabla
-      y += 2;
-      doc.setFontSize(12);
-      doc.setTextColor(37, 99, 235);
-      doc.text('TOTAL:', 150, y, { align: 'center' });
-      doc.text(`$${totalGeneral.toFixed(2)}`, 185, y, { align: 'center' });
-      doc.setTextColor(0, 0, 0);
-      y += 10;
-    } else {
-      doc.setTextColor(120, 120, 120);
-      doc.text('No hay productos en este pedido.', 14, y);
-      y += 7;
+      
+    } catch (error) {
+      console.error('❌ Error al generar PDF del pedido:', error);
+      toast.error('Error al generar el PDF del pedido: ' + (error.message || 'Error desconocido'), {
+        position: "top-right",
+        autoClose: 5000,
+      });
     }
-    y += 8; // Más espacio después de la tabla
-
-    // Total destacado
-    doc.setFontSize(13);
-    doc.setTextColor(37, 99, 235); // azul elegante
-    doc.setDrawColor(37, 99, 235);
-    doc.setLineWidth(0.7);
-    doc.line(120, y, 200, y);
-    y += 7;
-    doc.text(`Total: $${pedido.total?.toFixed(2) || ''}`, 175, y, { align: 'right' });
-    doc.setTextColor(0, 0, 0);
-    y += 10;
-
-    // Observaciones
-    if (pedido.notas) {
-      doc.setFontSize(11);
-      doc.setFillColor(254, 243, 199); // amarillo suave
-      doc.rect(10, y, 190, 10, 'F');
-      doc.setTextColor(202, 138, 4);
-      doc.text('Observaciones:', 12, y + 6);
-      doc.setTextColor(0, 0, 0);
-      doc.text(String(pedido.notas), 45, y + 6);
-      y += 14;
-    }
-
-    // Pie de página elegante
-    doc.setFontSize(11);
-    doc.setTextColor(120, 120, 120);
-    doc.text('¡Gracias por tu compra! Para dudas o soporte, contáctanos.', 12, 290);
-    doc.save(`pedido_${pedido.numero_pedido || ''}.pdf`);
   };
 
   // Función para obtener el color del estado
@@ -739,6 +736,40 @@ const OrdersPage = () => {
     </tr>
   );
 
+  // Función de prueba para el PDF de pedidos
+  const testPedidoPDF = async () => {
+    console.log('🧪 Iniciando prueba de PDF de pedido...');
+    
+    const testPedido = {
+      numero_pedido: 'TEST-001',
+      fecha_creacion: new Date().toISOString(),
+      cliente_nombre: 'Cliente de Prueba',
+      estado_pedido: 'pendiente',
+      metodo_pago: 'efectivo',
+      items: [
+        {
+          producto_nombre: 'Producto de Prueba',
+          sku: 'SKU-001',
+          cantidad: 2,
+          precio_unitario: 100,
+          subtotal: 200
+        }
+      ]
+    };
+    
+    try {
+      await handlePrintPedido(testPedido);
+      console.log('✅ Prueba de PDF completada');
+    } catch (error) {
+      console.error('❌ Error en la prueba:', error);
+    }
+  };
+
+  // Exponer la función de prueba globalmente
+  if (typeof window !== 'undefined') {
+    window.testPedidoPDF = testPedidoPDF;
+  }
+
   if (loading.initialLoad) return renderLoadingState();
   if (ui.error) return renderErrorState();
 
@@ -847,102 +878,19 @@ const OrdersPage = () => {
         </div>
       </div>
 
-      {/* Tabla de Pedidos con diseño sobrio */}
+      {/* Tabla de Pedidos estandarizada */}
       <div className="max-w-7xl mx-auto px-6 mb-6">
-        <div className="bg-theme-surface rounded-lg border border-theme-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-theme-background">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider cursor-pointer hover:bg-theme-secondary transition-colors"
-                      onClick={() => requestSort('numero_pedido')}>
-                    <div className="flex items-center">
-                      Pedido
-                      {getSortIcon('numero_pedido')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider cursor-pointer hover:bg-theme-secondary transition-colors"
-                      onClick={() => requestSort('cliente.nombre')}>
-                    <div className="flex items-center">
-                      Cliente
-                      {getSortIcon('cliente.nombre')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider cursor-pointer hover:bg-theme-secondary transition-colors"
-                      onClick={() => requestSort('estado_pedido')}>
-                    <div className="flex items-center">
-                      Estado
-                      {getSortIcon('estado_pedido')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider cursor-pointer hover:bg-theme-secondary transition-colors"
-                      onClick={() => requestSort('productos_count')}>
-                    <div className="flex items-center">
-                      Productos
-                      {getSortIcon('productos_count')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider cursor-pointer hover:bg-theme-secondary transition-colors"
-                      onClick={() => requestSort('total_pedido')}>
-                    <div className="flex items-center">
-                      Total
-                      {getSortIcon('total_pedido')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-theme-surface divide-y divide-theme-border">
-                {loading.pedidos ? (
-                  // Skeleton loading
-                  Array.from({ length: 5 }).map((_, index) => (
-                    <tr key={`skeleton-${index}`}>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 bg-theme-border rounded-lg animate-pulse"></div>
-                          <div className="ml-3">
-                            <div className="h-4 bg-theme-border rounded animate-pulse w-32"></div>
-                            <div className="h-3 bg-theme-border rounded animate-pulse w-24 mt-2"></div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="h-4 bg-theme-border rounded animate-pulse w-24"></div>
-                        <div className="h-3 bg-theme-border rounded animate-pulse w-32 mt-2"></div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="h-6 bg-theme-border rounded animate-pulse w-20"></div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="h-4 bg-theme-border rounded animate-pulse w-8"></div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="h-4 bg-theme-border rounded animate-pulse w-16"></div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex space-x-2">
-                          <div className="h-6 bg-theme-border rounded animate-pulse w-12"></div>
-                          <div className="h-6 bg-theme-border rounded animate-pulse w-12"></div>
-                          <div className="h-6 bg-theme-border rounded animate-pulse w-12"></div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (filteredPedidos && Array.isArray(filteredPedidos) && filteredPedidos.length === 0) ? (
-                  <tr key="empty-state">
-                    <td colSpan={6} className="px-6 py-12">
-                      {renderEmptyState()}
-                    </td>
-                  </tr>
-                ) : (
-                  (filteredPedidos && Array.isArray(filteredPedidos) ? filteredPedidos : []).map(renderPedidoRow)
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable
+          columns={getPedidoColumns(openDialogFor, null, handleDelete, handlePrintPedido)}
+          data={filteredPedidos || []}
+          sortConfig={sortConfig}
+          onSort={requestSort}
+          loading={loading.pedidos}
+          emptyMessage="No hay pedidos disponibles"
+          size="md"
+          striped={true}
+          hover={true}
+        />
       </div>
 
       {/* Modal de detalles del pedido */}

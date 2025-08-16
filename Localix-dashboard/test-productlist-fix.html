@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test ProductList Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .product-item {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .product-name {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .product-sku {
+            color: #6c757d;
+            font-size: 12px;
+        }
+        .product-price {
+            color: #28a745;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Test ProductList Fix</h1>
+        <p>Esta página verifica que las correcciones del ProductList funcionan correctamente con las URLs de API corregidas.</p>
+        
+        <div id="status" class="status info">Inicializando...</div>
+        
+        <div>
+            <button onclick="testAuth()">Verificar Auth</button>
+            <button onclick="testProductList()">Test ProductList</button>
+            <button onclick="testProductSearch()">Test Búsqueda</button>
+            <button onclick="clearLog()">Limpiar Log</button>
+        </div>
+        
+        <div class="log" id="log"></div>
+    </div>
+
+    <div class="container" id="products-preview" style="display: none;">
+        <h2>📦 Lista de Productos</h2>
+        <div id="products-list"></div>
+    </div>
+
+    <script>
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+        const productsPreview = document.getElementById('products-preview');
+        const productsList = document.getElementById('products-list');
+        
+        // Configuración de la API
+        const API_BASE = 'http://localhost:8000/api';
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            logEntry.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : type === 'warning' ? 'orange' : 'black';
+            log.appendChild(logEntry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function clearLog() {
+            log.innerHTML = '';
+        }
+        
+        function updateStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        function getAuthHeaders() {
+            const token = localStorage.getItem('access_token');
+            return token ? { 'Authorization': `Bearer ${token}` } : {};
+        }
+        
+        async function testAuth() {
+            addLog('🔐 Verificando autenticación...');
+            
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                addLog('✅ Token encontrado en localStorage', 'success');
+                updateStatus('Usuario autenticado', 'success');
+                return true;
+            } else {
+                addLog('❌ No hay token en localStorage', 'error');
+                updateStatus('Usuario no autenticado', 'error');
+                return false;
+            }
+        }
+        
+        async function testProductList() {
+            addLog('📦 Probando carga de lista de productos...');
+            
+            const headers = getAuthHeaders();
+            if (!headers.Authorization) {
+                addLog('❌ No hay token de autenticación', 'error');
+                return;
+            }
+            
+            try {
+                const startTime = Date.now();
+                
+                // Simular la llamada que hace ProductList.jsx
+                const searchParams = {
+                    page: 1,
+                    page_size: 20,
+                    ordering: 'nombre'
+                };
+                
+                const response = await fetch(`${API_BASE}/productos/productos/?${new URLSearchParams(searchParams)}`, { headers });
+                const data = await response.json();
+                
+                const loadTime = Date.now() - startTime;
+                
+                if (response.ok) {
+                    addLog(`✅ Productos cargados en ${loadTime}ms`, 'success');
+                    addLog(`📊 Total productos: ${data.count || 0}`, 'success');
+                    addLog(`📋 Productos en esta página: ${data.results?.length || 0}`, 'success');
+                    
+                    // Mostrar productos
+                    showProducts(data.results || []);
+                    
+                } else {
+                    addLog(`❌ Error cargando productos: ${response.status}`, 'error');
+                    addLog(`📄 Respuesta: ${JSON.stringify(data)}`, 'error');
+                }
+                
+            } catch (error) {
+                addLog(`❌ Error en test: ${error.message}`, 'error');
+                updateStatus('Error cargando productos', 'error');
+            }
+        }
+        
+        async function testProductSearch() {
+            addLog('🔍 Probando búsqueda de productos...');
+            
+            const headers = getAuthHeaders();
+            if (!headers.Authorization) {
+                addLog('❌ No hay token de autenticación', 'error');
+                return;
+            }
+            
+            try {
+                // Simular búsqueda
+                const searchParams = {
+                    search: 'producto',
+                    page_size: 5
+                };
+                
+                const response = await fetch(`${API_BASE}/productos/productos/?${new URLSearchParams(searchParams)}`, { headers });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addLog(`✅ Búsqueda exitosa - ${data.results?.length || 0} resultados`, 'success');
+                    
+                    if (data.results && data.results.length > 0) {
+                        addLog('📋 Resultados de búsqueda:', 'info');
+                        data.results.forEach((product, index) => {
+                            addLog(`  ${index + 1}. ${product.nombre} (SKU: ${product.sku})`, 'info');
+                        });
+                    }
+                    
+                } else {
+                    addLog(`❌ Error en búsqueda: ${response.status}`, 'error');
+                }
+                
+            } catch (error) {
+                addLog(`❌ Error en búsqueda: ${error.message}`, 'error');
+            }
+        }
+        
+        function showProducts(products) {
+            productsPreview.style.display = 'block';
+            
+            if (products.length === 0) {
+                productsList.innerHTML = '<p>No hay productos disponibles</p>';
+                return;
+            }
+            
+            productsList.innerHTML = products.map(product => `
+                <div class="product-item">
+                    <div class="product-name">${product.nombre}</div>
+                    <div class="product-sku">SKU: ${product.sku || 'N/A'}</div>
+                    <div class="product-price">$${product.precio || 0}</div>
+                    <div>Estado: ${product.estado || 'N/A'}</div>
+                    <div>Stock: ${product.stock || 0}</div>
+                </div>
+            `).join('');
+            
+            updateStatus('Productos cargados correctamente', 'success');
+        }
+        
+        // Inicialización
+        addLog('🚀 Página de test cargada');
+        testAuth();
+    </script>
+</body>
+</html>

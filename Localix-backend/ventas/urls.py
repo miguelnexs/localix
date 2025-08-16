@@ -12,6 +12,8 @@ router.register(r'productos', views.ProductoViewSet)
 urlpatterns = [
     # URLs del router de DRF
     path('', include(router.urls)),
+    # Endpoint adicional para resumen
+    path('resumen/', views.VentaViewSet.as_view({'get': 'resumen'}), name='ventas-resumen'),
 ]
 
 # Eliminadas las rutas de Mercado Pago 

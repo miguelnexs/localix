@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from ventas.models import Cliente, Venta
 from productos.models import Producto, ColorProducto
 
@@ -25,8 +25,16 @@ class Pedido(models.Model):
         ('cancelado', 'Cancelado'),
     ]
     
+    # Campo para multi-tenancy
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        verbose_name="Usuario propietario",
+        help_text="Usuario que posee este pedido"
+    )
+
     # Información básica
-    numero_pedido = models.CharField(max_length=20, unique=True)
+    numero_pedido = models.CharField(max_length=20)
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='pedidos')
     venta = models.OneToOneField(Venta, on_delete=models.CASCADE, related_name='pedido')
     
@@ -59,6 +67,11 @@ class Pedido(models.Model):
         ordering = ['-fecha_creacion']
         verbose_name = 'Pedido'
         verbose_name_plural = 'Pedidos'
+        indexes = [
+            models.Index(fields=['usuario', 'numero_pedido']),
+            models.Index(fields=['usuario', 'fecha_creacion']),
+            models.Index(fields=['usuario', 'estado_pedido']),
+        ]
     
     def __str__(self):
         return f"Pedido {self.numero_pedido} - {self.cliente.nombre}"
@@ -109,7 +122,7 @@ class HistorialPedido(models.Model):
     estado_nuevo = models.CharField(max_length=20)
     fecha_cambio = models.DateTimeField(auto_now_add=True)
     notas = models.TextField(blank=True)
-    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     
     class Meta:
         ordering = ['-fecha_cambio']

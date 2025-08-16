@@ -1,7 +1,24 @@
+import api from '../../api/axios';
+
 // Handler para obtener todos los pedidos
 export const getPedidos = async () => {
   try {
-    const response = await window.pedidosAPI.obtenerTodos();
+    // Verificar si el usuario está autenticado para usar HTTP directo o IPC
+    const token = localStorage.getItem('access_token');
+    const isAuthenticated = !!token;
+    
+    let response;
+    if (isAuthenticated) {
+      // Usar llamada HTTP directa
+      const apiResponse = await api.get('pedidos/pedidos/', { 
+        params: { ordering: '-fecha_creacion' } 
+      });
+      response = apiResponse.data;
+    } else {
+      // Usar IPC si no está autenticado
+      response = await window.pedidosAPI.obtenerTodos();
+    }
+    
     return response;
   } catch (error) {
     console.error('Error obteniendo pedidos:', error);
@@ -12,7 +29,20 @@ export const getPedidos = async () => {
 // Handler para obtener un pedido específico
 export const getPedido = async (pedidoId) => {
   try {
-    const response = await window.pedidosAPI.obtenerPorId(pedidoId);
+    // Verificar si el usuario está autenticado para usar HTTP directo o IPC
+    const token = localStorage.getItem('access_token');
+    const isAuthenticated = !!token;
+    
+    let response;
+    if (isAuthenticated) {
+      // Usar llamada HTTP directa
+      const apiResponse = await api.get(`pedidos/pedidos/${pedidoId}/`);
+      response = apiResponse.data;
+    } else {
+      // Usar IPC si no está autenticado
+      response = await window.pedidosAPI.obtenerPorId(pedidoId);
+    }
+    
     return response;
   } catch (error) {
     console.error('Error obteniendo pedido:', error);
@@ -23,7 +53,20 @@ export const getPedido = async (pedidoId) => {
 // Handler para actualizar un pedido
 export const updatePedido = async (pedidoId, pedidoData) => {
   try {
-    const response = await window.pedidosAPI.actualizar(pedidoId, pedidoData);
+    // Verificar si el usuario está autenticado para usar HTTP directo o IPC
+    const token = localStorage.getItem('access_token');
+    const isAuthenticated = !!token;
+    
+    let response;
+    if (isAuthenticated) {
+      // Usar llamada HTTP directa
+      const apiResponse = await api.put(`pedidos/pedidos/${pedidoId}/`, pedidoData);
+      response = apiResponse.data;
+    } else {
+      // Usar IPC si no está autenticado
+      response = await window.pedidosAPI.actualizar(pedidoId, pedidoData);
+    }
+    
     return response;
   } catch (error) {
     console.error('Error actualizando pedido:', error);
@@ -34,10 +77,25 @@ export const updatePedido = async (pedidoId, pedidoData) => {
 // Handler para cambiar el estado de un pedido
 export const cambiarEstadoPedido = async (pedidoId, nuevoEstado, notas = '') => {
   try {
-    const response = await window.pedidosAPI.cambiarEstado(pedidoId, {
-      estado_pedido: nuevoEstado,
-      notas: notas,
-    });
+    // Verificar si el usuario está autenticado para usar HTTP directo o IPC
+    const token = localStorage.getItem('access_token');
+    const isAuthenticated = !!token;
+    
+    let response;
+    if (isAuthenticated) {
+      // Usar llamada HTTP directa
+      const apiResponse = await api.patch(`pedidos/pedidos/${pedidoId}/`, {
+        estado_pedido: nuevoEstado
+      });
+      response = apiResponse.data;
+    } else {
+      // Usar IPC si no está autenticado
+      response = await window.pedidosAPI.cambiarEstado(pedidoId, {
+        estado_pedido: nuevoEstado,
+        notas: notas,
+      });
+    }
+    
     return response;
   } catch (error) {
     console.error('Error cambiando estado del pedido:', error);
@@ -48,7 +106,20 @@ export const cambiarEstadoPedido = async (pedidoId, nuevoEstado, notas = '') => 
 // Handler para obtener el historial de un pedido
 export const getHistorialPedido = async (pedidoId) => {
   try {
-    const response = await window.pedidosAPI.obtenerHistorial(pedidoId);
+    // Verificar si el usuario está autenticado para usar HTTP directo o IPC
+    const token = localStorage.getItem('access_token');
+    const isAuthenticated = !!token;
+    
+    let response;
+    if (isAuthenticated) {
+      // Usar llamada HTTP directa
+      const apiResponse = await api.get(`pedidos/pedidos/${pedidoId}/historial/`);
+      response = apiResponse.data;
+    } else {
+      // Usar IPC si no está autenticado
+      response = await window.pedidosAPI.obtenerHistorial(pedidoId);
+    }
+    
     return response;
   } catch (error) {
     console.error('Error obteniendo historial del pedido:', error);
@@ -59,7 +130,20 @@ export const getHistorialPedido = async (pedidoId) => {
 // Handler para obtener estadísticas de pedidos
 export const getEstadisticasPedidos = async () => {
   try {
-    const response = await window.pedidosAPI.obtenerEstadisticas();
+    // Verificar si el usuario está autenticado para usar HTTP directo o IPC
+    const token = localStorage.getItem('access_token');
+    const isAuthenticated = !!token;
+    
+    let response;
+    if (isAuthenticated) {
+      // Usar llamada HTTP directa
+      const apiResponse = await api.get('pedidos/pedidos/estadisticas/');
+      response = apiResponse.data;
+    } else {
+      // Usar IPC si no está autenticado
+      response = await window.pedidosAPI.obtenerEstadisticas();
+    }
+    
     return response;
   } catch (error) {
     console.error('Error obteniendo estadísticas de pedidos:', error);
@@ -70,7 +154,20 @@ export const getEstadisticasPedidos = async () => {
 // Handler para eliminar un pedido
 export const deletePedido = async (pedidoId) => {
   try {
-    const response = await window.pedidosAPI.eliminar(pedidoId);
+    // Verificar si el usuario está autenticado para usar HTTP directo o IPC
+    const token = localStorage.getItem('access_token');
+    const isAuthenticated = !!token;
+    
+    let response;
+    if (isAuthenticated) {
+      // Usar llamada HTTP directa
+      const apiResponse = await api.delete(`pedidos/pedidos/${pedidoId}/`);
+      response = apiResponse.data;
+    } else {
+      // Usar IPC si no está autenticado
+      response = await window.pedidosAPI.eliminar(pedidoId);
+    }
+    
     return response;
   } catch (error) {
     console.error('Error eliminando pedido:', error);

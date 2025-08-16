@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status, filters, serializers
+from rest_framework import viewsets, status, filters, serializers, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -25,16 +25,20 @@ class CategoriaViewSet(viewsets.ModelViewSet):
     ordering = ['orden', 'nombre']
     lookup_field = 'slug'
     parser_classes = (MultiPartParser, FormParser, JSONParser)
+    
+    def get_queryset(self):
+        """
+        Filtra las categorías por usuario autenticado
+        """
+        if self.request.user.is_authenticated:
+            return CategoriaProducto.objects.filter(usuario=self.request.user)
+        return CategoriaProducto.objects.none()
 
     def create(self, request, *args, **kwargs):
         """Crear categoría con mejor manejo de errores"""
         try:
             logger.info(f"Creando categoría con datos: {request.data}")
             logger.info(f"Archivos recibidos: {request.FILES}")
-            
-            # Debug: verificar datos recibidos
-            print("Vista: Datos recibidos:", request.data)
-            print("Vista: Archivos recibidos:", request.FILES)
             
             # Validar que los datos básicos estén presentes
             if not request.data.get('nombre'):
@@ -94,6 +98,8 @@ class CategoriaViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
+
     def perform_create(self, serializer):
         """Crear categoría con validación de imagen"""
         try:
@@ -152,7 +158,7 @@ class CategoriaViewSet(viewsets.ModelViewSet):
             logger.error(f"Error al procesar imagen: {str(e)}")
             raise
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[permissions.AllowAny])
     def test_connection(self, request):
         """Endpoint de prueba para diagnosticar problemas"""
         try:

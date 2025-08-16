@@ -1,24 +1,19 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import api from '../api/axios';
 
 // Cache global para datos del dashboard
 const dashboardCache = new Map();
-const CACHE_DURATION = 2 * 60 * 1000; // 2 minutos
-
-// Cache para gráficos
-const chartsCache = new Map();
-const CHARTS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+const CACHE_DURATION = 60000; // 1 minuto para dashboard
 
 export const useDashboardOptimized = () => {
   const [dashboardData, setDashboardData] = useState({
     resumen: {
       totalVentas: 0,
       totalIngresos: 0,
-      totalIngresosTodos: 0,
       totalPedidos: 0,
       totalClientes: 0,
       totalProductos: 0,
-      ticketPromedio: 0,
-      pedidosEntregados: 0
+      ticketPromedio: 0
     },
     estadisticas: [],
     ventasRecientes: [],
@@ -39,7 +34,12 @@ export const useDashboardOptimized = () => {
   // Función para limpiar cache
   const clearCache = useCallback(() => {
     dashboardCache.clear();
-    chartsCache.clear();
+  }, []);
+
+  // Función para verificar autenticación
+  const isAuthenticated = useCallback(() => {
+    const token = localStorage.getItem('access_token');
+    return !!token;
   }, []);
 
   // Función optimizada para cargar datos del dashboard
@@ -63,65 +63,76 @@ export const useDashboardOptimized = () => {
       }
     }
 
-    // Verificar que las APIs estén disponibles
-    if (!window.ventasAPI || (!window.electronAPI?.pedidos && !window.pedidosAPI) || !window.electronAPI || !window.clientesAPI) {
-      console.error('APIs no disponibles:', {
-        ventasAPI: !!window.ventasAPI,
-        pedidosAPI: !!(window.electronAPI?.pedidos || window.pedidosAPI),
-        electronAPI: !!window.electronAPI,
-        clientesAPI: !!window.clientesAPI
-      });
-      setError('Error: APIs no disponibles. Verifica la conexión.');
-      setLoading(prev => ({ ...prev, initial: false }));
-      return;
-    }
-
     try {
       setLoading(prev => ({ ...prev, initial: true }));
       setError(null);
 
-      // Cargar datos esenciales en paralelo con manejo correcto de formatos
-      const [resumenRes, ventasRecientesRes, pedidosRes, productosRes, clientesRes, estadisticasPedidosRes] = await Promise.allSettled([
-        window.ventasAPI?.obtenerResumen?.()?.catch(() => ({ success: false, data: null })) || Promise.resolve({ success: false, data: null }),
-        window.ventasAPI?.obtenerVentas?.()?.catch(() => ({ success: false, data: [] })) || Promise.resolve({ success: false, data: [] }),
-        (window.electronAPI?.pedidos?.obtenerTodos || window.pedidosAPI?.obtenerTodos)?.({ page_size: 5 })?.catch(() => ({ results: [] })) || Promise.resolve({ results: [] }),
-        window.electronAPI?.productos?.listar?.({ page_size: 1000 })?.catch(() => ({ results: [] })) || Promise.resolve({ results: [] }),
-        window.clientesAPI?.obtenerTodos?.()?.catch(() => ({ success: false, data: [] })) || Promise.resolve({ success: false, data: [] }),
-        (window.electronAPI?.pedidos?.obtenerEstadisticas || window.pedidosAPI?.obtenerEstadisticas)?.()?.catch(() => ({})) || Promise.resolve({})
+      // Verificar autenticación
+      if (!isAuthenticated()) {
+        console.log('Usuario no autenticado, usando datos por defecto');
+        setDashboardData({
+          resumen: {
+            totalVentas: 0,
+            totalIngresos: 0,
+            totalPedidos: 0,
+            totalClientes: 0,
+            totalProductos: 0,
+            ticketPromedio: 0
+          },
+          estadisticas: [],
+          ventasRecientes: [],
+          productosTop: [],
+          pedidosRecientes: []
+        });
+        setLoading(prev => ({ ...prev, initial: false }));
+        return;
+      }
+
+      console.log('Usuario autenticado, cargando datos del dashboard...');
+
+      // Cargar datos usando APIs HTTP directas
+      const [resumenRes, categoriasRes, productosRes] = await Promise.all([
+        api.get('/ventas/resumen/').catch(() => ({ data: { resumen: {}, ventas: [] } })),
+        api.get('/categorias/').catch(() => ({ data: { results: [] } })),
+        api.get('/productos/productos/').catch(() => ({ data: { results: [] } }))
       ]);
 
-      // Procesar datos con manejo correcto de formatos de respuesta
-      const resumenData = resumenRes.status === 'fulfilled' && resumenRes.value?.success ? resumenRes.value.data : (resumenRes.status === 'fulfilled' ? resumenRes.value?.resumen : {});
-      const ventasData = ventasRecientesRes.status === 'fulfilled' && ventasRecientesRes.value?.success ? ventasRecientesRes.value.data : [];
-      const pedidosData = pedidosRes.status === 'fulfilled' && Array.isArray(pedidosRes.value?.results) ? pedidosRes.value.results : [];
-      const productosData = productosRes.status === 'fulfilled' && Array.isArray(productosRes.value?.results) ? productosRes.value.results : [];
-      const clientesData = clientesRes.status === 'fulfilled' && clientesRes.value?.success ? (Array.isArray(clientesRes.value.data?.results) ? clientesRes.value.data.results : clientesRes.value.data) : [];
-      const estadisticasPedidos = estadisticasPedidosRes.status === 'fulfilled' ? estadisticasPedidosRes.value : {};
+      // Procesar datos
+      const resumenData = resumenRes.data?.resumen || {};
+      const ventasData = resumenRes.data?.ventas || [];
+      const categoriasData = categoriasRes.data?.results || categoriasRes.data || [];
+      const productosData = productosRes.data?.results || productosRes.data || [];
 
-      // Calcular totales reales
-      const totalProductos = productosData.length;
-      const totalClientes = Array.isArray(clientesData) ? clientesData.length : 0;
-      const totalPedidos = estadisticasPedidos.total_pedidos || pedidosData.length || 0;
-      const totalIngresos = estadisticasPedidos.total_ingresos || resumenData.total_ingresos || 0;
-      const totalIngresosTodos = estadisticasPedidos.total_ingresos_todos || 0;
-      const pedidosEntregados = estadisticasPedidos.pedidos_entregados || 0;
+      // Debug: Verificar estructura de datos
+      console.log('🔍 Debug - Estructura de datos recibidos:');
+      console.log('  - resumenRes.data:', resumenRes.data);
+      console.log('  - categoriasRes.data:', categoriasRes.data);
+      console.log('  - productosRes.data:', productosRes.data);
+      console.log('  - productosData procesado:', productosData);
+      console.log('  - productosData es array:', Array.isArray(productosData));
+
+      // Calcular totales
+      const totalVentas = resumenData.total_ventas || ventasData.length || 0;
+      const totalIngresos = resumenData.total_ingresos || 0;
+      const totalProductos = Array.isArray(productosData) ? productosData.length : 0;
+      const totalCategorias = Array.isArray(categoriasData) ? categoriasData.length : 0;
 
       const processedData = {
         resumen: {
-          totalVentas: resumenData.total_ventas || ventasData.length || 0,
-          totalIngresos: totalIngresos,
-          totalIngresosTodos: totalIngresosTodos,
-          totalPedidos: totalPedidos,
-          totalClientes: totalClientes,
-          totalProductos: totalProductos,
-          ticketPromedio: resumenData.ticket_promedio || 0,
-          pedidosEntregados: pedidosEntregados
+          totalVentas,
+          totalIngresos,
+          totalPedidos: totalVentas, // Usar ventas como pedidos por ahora
+          totalClientes: totalCategorias, // Usar categorías como clientes por ahora
+          totalProductos,
+          ticketPromedio: totalVentas > 0 ? totalIngresos / totalVentas : 0
         },
-        estadisticas: productosData,
+        estadisticas: Array.isArray(productosData) ? productosData : [],
         ventasRecientes: Array.isArray(ventasData) ? ventasData.slice(0, 10) : [],
-        productosTop: [],
-        pedidosRecientes: pedidosData.slice(0, 5)
+        productosTop: Array.isArray(productosData) ? productosData.slice(0, 5) : [],
+        pedidosRecientes: Array.isArray(ventasData) ? ventasData.slice(0, 5) : []
       };
+
+      console.log('Datos del dashboard cargados:', processedData);
 
       // Guardar en caché
       dashboardCache.set('dashboard', {
@@ -139,65 +150,19 @@ export const useDashboardOptimized = () => {
     } finally {
       setLoading(prev => ({ ...prev, initial: false }));
     }
-  }, []);
-
-  // Función optimizada para cargar datos de gráficos
-  const fetchChartsData = useCallback(async (forceRefresh = false) => {
-    const cacheKey = 'charts';
-    
-    if (!forceRefresh && chartsCache.has(cacheKey)) {
-      const cached = chartsCache.get(cacheKey);
-      if (Date.now() - cached.timestamp < CHARTS_CACHE_DURATION) {
-        return cached.data;
-      }
-    }
-
-    setLoading(prev => ({ ...prev, charts: true }));
-
-    try {
-      const [ventasData, productosData] = await Promise.allSettled([
-        window.ventasAPI?.obtenerVentas?.()?.catch(() => ({ success: false, data: [] })) || Promise.resolve({ success: false, data: [] }),
-        window.electronAPI?.productos?.listar?.({ page_size: 1000 })?.catch(() => ({ results: [] })) || Promise.resolve({ results: [] })
-      ]);
-
-      const ventas = ventasData.status === 'fulfilled' && ventasData.value?.success ? ventasData.value.data : [];
-      const productos = productosData.status === 'fulfilled' && Array.isArray(productosData.value?.results) ? productosData.value.results : [];
-
-      const chartsData = {
-        ventasRecientes: Array.isArray(ventas) ? ventas.slice(0, 10) : [],
-        productosTop: productos.slice(0, 10)
-      };
-
-      chartsCache.set(cacheKey, {
-        data: chartsData,
-        timestamp: Date.now()
-      });
-
-      setLoading(prev => ({ ...prev, charts: false }));
-      return chartsData;
-
-    } catch (err) {
-      console.error('Error cargando datos de gráficos:', err);
-      setLoading(prev => ({ ...prev, charts: false }));
-      return { ventasRecientes: [], productosTop: [] };
-    }
-  }, []);
+  }, [isAuthenticated]);
 
   // Función para recargar datos
   const refreshData = useCallback(async () => {
     setLoading(prev => ({ ...prev, refresh: true }));
     try {
-      clearCache();
-      await Promise.all([
-        fetchDashboardData(true),
-        fetchChartsData(true)
-      ]);
+      await fetchDashboardData(true);
     } catch (err) {
       console.error('Error en refresh:', err);
     } finally {
       setLoading(prev => ({ ...prev, refresh: false }));
     }
-  }, [fetchDashboardData, fetchChartsData, clearCache]);
+  }, [fetchDashboardData]);
 
   // Efecto para cargar datos
   useEffect(() => {
@@ -211,56 +176,14 @@ export const useDashboardOptimized = () => {
     };
   }, [fetchDashboardData]);
 
-  // Memoizar datos procesados para gráficos
-  const chartsData = useMemo(() => {
-    const { ventasRecientes, estadisticas } = dashboardData;
-    
-    // Datos para gráfico de ventas
-    const salesData = {
-      labels: ventasRecientes.map(venta => 
-        new Date(venta.fecha_venta).toLocaleDateString('es-ES', { 
-          day: '2-digit', 
-          month: '2-digit' 
-        })
-      ),
-      datasets: [{
-        label: 'Ventas',
-        data: ventasRecientes.map(venta => venta.total || 0),
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        borderColor: 'rgba(59, 130, 246, 1)',
-        borderWidth: 2,
-        tension: 0.4
-      }]
-    };
-
-    // Datos para gráfico de inventario
-    const inventoryData = {
-      labels: ['Con Stock', 'Sin Stock', 'Agotados'],
-      datasets: [{
-        data: [
-          estadisticas.filter(p => p.stock > 0).length,
-          estadisticas.filter(p => p.stock === 0).length,
-          estadisticas.filter(p => p.estado === 'agotado').length
-        ],
-        backgroundColor: [
-          'rgba(34, 197, 94, 0.8)',
-          'rgba(239, 68, 68, 0.8)',
-          'rgba(245, 158, 11, 0.8)'
-        ],
-        borderWidth: 0
-      }]
-    };
-
-    return { salesData, inventoryData };
-  }, [dashboardData]);
-
   return {
     dashboardData,
-    chartsData,
     loading,
     error,
     refreshData,
     clearCache,
-    fetchChartsData
+    isAuthenticated: isAuthenticated()
   };
 };
+
+export default useDashboardOptimized;

@@ -4,7 +4,12 @@ import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 // Layout
 import MainLayout from '../components/layout/MainLayout';
 
+// Auth Components
+import ProtectedRoute from '../components/auth/ProtectedRoute';
+import { AuthProvider } from '../context/AuthContext';
+
 // Pages
+import LoginPage from '../pages/LoginPage';
 import DashboardPage from '../pages/DashboardPage';
 import ProductsPage from '../pages/ProductsPage';
 import OrdersPage from '../pages/OrdersPage';
@@ -23,30 +28,39 @@ import TypographyDemo from '../components/ui/TypographyDemo';
 const AppRouter = () => {
   return (
     <Router>
-      <Routes>
-        {/* Ruta principal con layout */}
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="products" element={<ProductsPage />} />
-          <Route path="product/new" element={<ProductFormPage />} />
-          <Route path="product/edit/:slug" element={<ProductFormPage />} />
-          <Route path="/categories" element={<CategoriesPage />} />
-          <Route path="/categoria/:slug" element={<CategoriesPage />} />
-          <Route path="orders" element={<OrdersPage />} />
-          <Route path="customers" element={<CustomerPage />} />
-          <Route path="quick-sales" element={<VentasPage />} />
-                      <Route path="theme-demo" element={<ThemeDemo />} />
+      <AuthProvider>
+        <Routes>
+          {/* Ruta de login (pública) */}
+          <Route path="/login" element={<LoginPage />} />
+          
+          {/* Rutas protegidas con layout */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }>
+            <Route index element={<DashboardPage />} />
+            <Route path="products" element={<ProductsPage />} />
+            <Route path="product/new" element={<ProductFormPage />} />
+            <Route path="product/edit/:slug" element={<ProductFormPage />} />
+            <Route path="/categories" element={<CategoriesPage />} />
+            <Route path="/categoria/:slug" element={<CategoriesPage />} />
+            <Route path="orders" element={<OrdersPage />} />
+            <Route path="customers" element={<CustomerPage />} />
+            <Route path="quick-sales" element={<VentasPage />} />
+            <Route path="theme-demo" element={<ThemeDemo />} />
             <Route path="scrollbar-demo" element={<ScrollbarDemo />} />
             <Route path="typography-demo" element={<TypographyDemo />} />
-          {/* Eliminada la ruta de Analíticas */}
-        </Route>
+          </Route>
 
-        {/* Página de producto individual (puede ir fuera si es un detalle público) */}
-        <Route path="/product/:slug" element={<ProductPage />} />
-        <Route path="/help" element={<HelpPage />} />
+          {/* Página de producto individual (puede ir fuera si es un detalle público) */}
+          <Route path="/product/:slug" element={<ProductPage />} />
+          <Route path="/help" element={<HelpPage />} />
 
-        {/* Ruta 404 - Opcional pero recomendado */}
-      </Routes>
+          {/* Redirigir rutas no encontradas al login */}
+          <Route path="*" element={<LoginPage />} />
+        </Routes>
+      </AuthProvider>
     </Router>
   );
 };

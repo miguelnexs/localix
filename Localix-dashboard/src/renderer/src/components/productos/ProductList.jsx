@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import api from '../../api/axios';
 import {
   Search, Plus, RefreshCw, Eye, Edit, Trash2,
   Package, Filter, ArrowUpDown, ChevronDown, ChevronUp,
@@ -18,6 +19,10 @@ import ErrorBoundary from './ErrorBoundary';
 import ProductColorsDisplay from './ProductColorsDisplay';
 import SmartProductSearch from './SmartProductSearch';
 
+// Componentes UI estandarizados
+import DataTable from '../ui/DataTable';
+import ActionButtons from '../ui/ActionButtons';
+
 // Hooks y utilidades
 import { useToast } from '../../hooks/useToast';
 import { useDeleteConfirmation } from '../../hooks/useDeleteConfirmation';
@@ -32,6 +37,104 @@ function getImageUrl(url) {
   if (url.startsWith('/')) return RESOURCE_URL(url);
   return url;
 }
+
+// Configuración de columnas para la tabla estandarizada
+const getProductColumns = (onView, onEdit, onDelete) => [
+  {
+    key: 'producto',
+    label: 'Producto',
+    sortable: true,
+    render: (product) => (
+      <div className="flex items-center space-x-3">
+        <div className="flex-shrink-0">
+          {product.imagen_principal_url ? (
+            <img
+              src={getImageUrl(product.imagen_principal_url)}
+              alt={product.nombre}
+              className="w-10 h-10 rounded-lg object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-10 h-10 bg-theme-border rounded-lg flex items-center justify-center">
+              <Package className="w-5 h-5 text-theme-textSecondary" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-theme-text truncate">
+            {product.nombre}
+          </p>
+          <p className="text-sm text-theme-textSecondary truncate">
+            SKU: {product.sku || 'N/A'}
+          </p>
+        </div>
+      </div>
+    )
+  },
+  {
+    key: 'precio',
+    label: 'Precio',
+    sortable: true,
+    render: (product) => (
+      <div className="text-right">
+        <p className="text-sm font-medium text-theme-text">
+          {formatPrice(product.precio)}
+        </p>
+        {product.precio_anterior && (
+          <p className="text-xs text-theme-textSecondary line-through">
+            {formatPrice(product.precio_anterior)}
+          </p>
+        )}
+      </div>
+    )
+  },
+  {
+    key: 'estado',
+    label: 'Estado',
+    sortable: true,
+    render: (product) => <ProductStatusChip status={product.estado} />
+  },
+  {
+    key: 'stock',
+    label: 'Stock',
+    sortable: true,
+    render: (product) => (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+        product.stock > 0 
+          ? 'bg-green-100 text-green-800' 
+          : 'bg-red-100 text-red-800'
+      }`}>
+        {product.stock} unidades
+      </span>
+    )
+  },
+  {
+    key: 'categoria',
+    label: 'Categoría',
+    sortable: true,
+    render: (product) => product.categoria?.nombre || 'Sin categoría'
+  },
+  {
+    key: 'fecha_creacion',
+    label: 'Fecha',
+    sortable: true,
+    render: (product) => new Date(product.fecha_creacion).toLocaleDateString()
+  },
+  {
+    key: 'acciones',
+    label: 'Acciones',
+    sortable: false,
+    render: (product) => (
+      <ActionButtons
+        onView={() => onView(product)}
+        onEdit={() => onEdit(product)}
+        onDelete={() => onDelete(product)}
+        size="sm"
+        variant="compact"
+      />
+    )
+  }
+];
 
 const ProductList = () => {
   const navigate = useNavigate();
@@ -139,10 +242,24 @@ const ProductList = () => {
     }
 
     try {
-      const response = await window.electronAPI.productos.buscar({
-        search: searchTerm,
-        page_size: 5
-      });
+      // Verificar si el usuario está autenticado para usar HTTP directo o IPC
+      const token = localStorage.getItem('access_token');
+      const isAuthenticated = !!token;
+      
+      let response;
+      if (isAuthenticated) {
+        // Usar llamada HTTP directa
+        const apiResponse = await api.get('productos/productos/', { 
+          params: { search: searchTerm, page_size: 5 } 
+        });
+        response = apiResponse.data;
+      } else {
+        // Usar IPC si no está autenticado
+        response = await window.electronAPI.productos.buscar({
+          search: searchTerm,
+          page_size: 5
+        });
+      }
       
       if (response?.results) {
         setSuggestions(response.results);
@@ -210,7 +327,19 @@ const ProductList = () => {
         searchParams.created_lte = appliedFilters.fechaHasta;
       }
       
-      const response = await window.electronAPI.productos.listar(searchParams);
+      // Verificar si el usuario está autenticado para usar HTTP directo o IPC
+      const token = localStorage.getItem('access_token');
+      const isAuthenticated = !!token;
+      
+      let response;
+      if (isAuthenticated) {
+        // Usar llamada HTTP directa
+        const apiResponse = await api.get('productos/productos/', { params: searchParams });
+        response = apiResponse.data; // Extraer los datos de la respuesta HTTP
+      } else {
+        // Usar IPC si no está autenticado
+        response = await window.electronAPI.productos.listar(searchParams);
+      }
       const productsData = Array.isArray(response?.results)
         ? response.results
         : (Array.isArray(response) ? response : []);
@@ -841,104 +970,23 @@ const ProductList = () => {
         </div>
       </div>
 
-      {/* Tabla de Productos con diseño sobrio */}
+      {/* Tabla de Productos estandarizada */}
       <div className="max-w-7xl mx-auto px-6 mb-6">
-        <div className="bg-theme-surface rounded-lg border border-theme-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-theme-background">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider cursor-pointer hover:bg-theme-secondary transition-colors"
-                      onClick={() => requestSort('nombre')}>
-                    <div className="flex items-center">
-                      Producto
-                      {getSortIcon('nombre')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider cursor-pointer hover:bg-theme-secondary transition-colors"
-                      onClick={() => requestSort('sku')}>
-                    <div className="flex items-center">
-                      SKU
-                      {getSortIcon('sku')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider cursor-pointer hover:bg-theme-secondary transition-colors"
-                      onClick={() => requestSort('precio')}>
-                    <div className="flex items-center">
-                      Precio
-                      {getSortIcon('precio')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider cursor-pointer hover:bg-theme-secondary transition-colors"
-                      onClick={() => requestSort('stock')}>
-                    <div className="flex items-center">
-                      Stock
-                      {getSortIcon('stock')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">
-                    Estado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-theme-surface divide-y divide-theme-border">
-                {isLoading.products ? (
-                  // Skeleton loading
-                  Array.from({ length: 5 }).map((_, index) => (
-                    <tr key={`skeleton-${index}`}>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 bg-theme-border rounded-lg animate-pulse"></div>
-                          <div className="ml-3">
-                            <div className="h-4 bg-theme-border rounded animate-pulse w-32"></div>
-                            <div className="h-3 bg-theme-border rounded animate-pulse w-24 mt-2"></div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="h-4 bg-theme-border rounded animate-pulse w-16"></div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="h-4 bg-theme-border rounded animate-pulse w-20"></div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="h-4 bg-theme-border rounded animate-pulse w-12"></div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="h-6 bg-theme-border rounded animate-pulse w-16"></div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex space-x-2">
-                          <div className="h-6 bg-theme-border rounded animate-pulse w-12"></div>
-                          <div className="h-6 bg-theme-border rounded animate-pulse w-12"></div>
-                          <div className="h-6 bg-theme-border rounded animate-pulse w-12"></div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : sortedProducts.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12">
-                      {renderEmptyState()}
-                    </td>
-                  </tr>
-                ) : (
-                  sortedProducts.map(renderProductRow)
-                )}
-              </tbody>
-            </table>
-          </div>
-          
-          {/* Indicador de carga para paginación infinita */}
-          {pagination.loading && (
-            <div className="px-6 py-4 border-t border-theme-border flex justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            </div>
+        <DataTable
+          columns={getProductColumns(
+            (product) => openDialogFor(product, 'view'),
+            (product) => openDialogFor(product, 'edit'),
+            (product) => handleDeleteProduct(product.slug)
           )}
-        </div>
+          data={sortedProducts}
+          sortConfig={sortConfig}
+          onSort={requestSort}
+          loading={isLoading}
+          emptyMessage="No hay productos disponibles"
+          size="md"
+          striped={true}
+          hover={true}
+        />
       </div>
 
       {/* Diálogos */}

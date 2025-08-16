@@ -53,9 +53,11 @@ class ProductoViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Sobreescribe el queryset para incluir filtros personalizados
+        Sobreescribe el queryset para incluir filtros personalizados y multi-tenancy
         """
-        queryset = super().get_queryset()
+        queryset = Producto.objects.filter(usuario=self.request.user).prefetch_related(
+            'variantes',
+        ).order_by('-fecha_creacion')
         
         # Filtro para productos públicos
         if self.request.query_params.get('publicos') == 'true':
@@ -369,11 +371,17 @@ class ProductoViewSet(viewsets.ModelViewSet):
         """
         Crea un nuevo producto con respuesta enriquecida
         """
+        # Debug: Verificar autenticación al inicio
+        print(f"🔍 DEBUG CREATE - Usuario: {request.user}")
+        print(f"🔍 DEBUG CREATE - Autenticado: {request.user.is_authenticated}")
+        print(f"🔍 DEBUG CREATE - Auth header: {request.headers.get('Authorization', 'No encontrado')}")
+        
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
         try:
-            producto = serializer.save()
+            # Usar perform_create para asignar el usuario correctamente
+            producto = self.perform_create(serializer)
             
             # Generar thumbnail si se subió imagen
             if 'imagen_principal' in request.FILES:
@@ -526,3 +534,17 @@ class ProductoViewSet(viewsets.ModelViewSet):
                 {'error': f'Error actualizando stock: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    def perform_create(self, serializer):
+        """
+        Crear producto y asignar usuario
+        """
+        # Debug: Verificar que el usuario esté autenticado
+        if not self.request.user.is_authenticated:
+            print(f"❌ ERROR: Usuario no autenticado en perform_create")
+            print(f"❌ request.user: {self.request.user}")
+            print(f"❌ request.auth: {self.request.auth}")
+            raise Exception("Usuario no autenticado")
+        
+        print(f"✅ Usuario autenticado: {self.request.user.username} (ID: {self.request.user.id})")
+        return serializer.save(usuario=self.request.user)

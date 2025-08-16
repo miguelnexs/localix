@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from decimal import Decimal
 from django.core.validators import MinValueValidator
@@ -18,6 +19,14 @@ class Cliente(models.Model):
         ('ce', 'Carné de Extranjería'),
         ('pasaporte', 'Pasaporte'),
     ]
+
+    # Campo para multi-tenancy
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        verbose_name=_("Usuario propietario"),
+        help_text=_("Usuario que posee este cliente")
+    )
 
     nombre = models.CharField(
         max_length=200,
@@ -72,9 +81,9 @@ class Cliente(models.Model):
         verbose_name_plural = _("Clientes")
         ordering = ['-fecha_registro']
         indexes = [
-            models.Index(fields=['nombre']),
-            models.Index(fields=['email']),
-            models.Index(fields=['numero_documento']),
+            models.Index(fields=['usuario', 'nombre']),
+            models.Index(fields=['usuario', 'email']),
+            models.Index(fields=['usuario', 'numero_documento']),
         ]
 
     def __str__(self) -> str:
@@ -100,10 +109,19 @@ class Venta(models.Model):
         ('otro', _('Otro')),
     ]
 
+    # Campo para multi-tenancy
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        verbose_name=_("Usuario propietario"),
+        help_text=_("Usuario que posee esta venta")
+    )
+
     # Información básica
     numero_venta = models.CharField(
         max_length=20,
-        unique=True,
+        blank=True,
+        null=True,
         verbose_name=_("Número de venta")
     )
     
@@ -224,10 +242,10 @@ class Venta(models.Model):
         verbose_name_plural = _("Ventas")
         ordering = ['-fecha_venta']
         indexes = [
-            models.Index(fields=['numero_venta']),
-            models.Index(fields=['fecha_venta']),
-            models.Index(fields=['estado']),
-            models.Index(fields=['cliente']),
+            models.Index(fields=['usuario', 'numero_venta']),
+            models.Index(fields=['usuario', 'fecha_venta']),
+            models.Index(fields=['usuario', 'estado']),
+            models.Index(fields=['usuario', 'cliente']),
         ]
 
     def save(self, *args, **kwargs):

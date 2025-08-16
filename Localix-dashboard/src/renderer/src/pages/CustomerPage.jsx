@@ -4,7 +4,7 @@ import {
   Search, Filter, Download, Plus,
   ChevronDown, ChevronUp, ArrowUpDown,
   User, Mail, Phone, ShoppingBag, Calendar,
-  Eye, Edit, Trash2, DollarSign, Package
+  Eye, Edit, Trash2, DollarSign, Package, RefreshCw
 } from 'lucide-react';
 import CustomerModal from '../components/CustomerModal';
 import { toast } from 'react-toastify';
@@ -15,6 +15,7 @@ const CustomersPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: 'nombre', direction: 'asc' });
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [clientes, setClientes] = useState([]);
   const [ventas, setVentas] = useState([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
@@ -28,13 +29,33 @@ const CustomersPage = () => {
     cargarDatos();
   }, []);
 
-  const cargarDatos = async () => {
-    setLoading(true);
+  const cargarDatos = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    
     try {
+      console.log('🔄 [CUSTOMER PAGE] Iniciando carga de datos...');
+      
+      // Verificar que las APIs estén disponibles
+      if (!window.clientesAPI || !window.ventasAPI) {
+        console.error('❌ [CUSTOMER PAGE] APIs no disponibles:', {
+          clientesAPI: !!window.clientesAPI,
+          ventasAPI: !!window.ventasAPI
+        });
+        toast.error('Error: APIs no disponibles. Verifica la conexión.');
+        return;
+      }
+
       const [clientesRes, ventasRes] = await Promise.all([
         window.clientesAPI.obtenerTodos(),
         window.ventasAPI.obtenerVentas()
       ]);
+      
+      console.log('📊 [CUSTOMER PAGE] Respuesta clientes:', clientesRes);
+      console.log('📊 [CUSTOMER PAGE] Respuesta ventas:', ventasRes);
       
       if (clientesRes.success) {
         // Verificar si data es un array o tiene la estructura de paginación
@@ -48,9 +69,15 @@ const CustomersPage = () => {
           clientesData = clientesRes.data.results || [];
         }
         setClientes(clientesData);
+        console.log('✅ [CUSTOMER PAGE] Clientes cargados:', clientesData.length);
+        
+        if (isRefresh) {
+          toast.success(`Datos actualizados. ${clientesData.length} clientes cargados.`);
+        }
       } else {
-        console.error('Error cargando clientes:', clientesRes.error);
+        console.error('❌ [CUSTOMER PAGE] Error cargando clientes:', clientesRes.error);
         setClientes([]);
+        toast.error(`Error al cargar clientes: ${clientesRes.error}`);
       }
       
       if (ventasRes.success) {
@@ -65,17 +92,26 @@ const CustomersPage = () => {
           ventasData = ventasRes.data.results || [];
         }
         setVentas(ventasData);
+        console.log('✅ [CUSTOMER PAGE] Ventas cargadas:', ventasData.length);
       } else {
-        console.error('Error cargando ventas:', ventasRes.error);
+        console.error('❌ [CUSTOMER PAGE] Error cargando ventas:', ventasRes.error);
         setVentas([]);
+        toast.error(`Error al cargar ventas: ${ventasRes.error}`);
       }
     } catch (error) {
-      console.error('Error cargando datos:', error);
+      console.error('❌ [CUSTOMER PAGE] Error cargando datos:', error);
       setClientes([]);
       setVentas([]);
+      toast.error(`Error de conexión: ${error.message}`);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  // Función para recargar datos
+  const handleRefresh = () => {
+    cargarDatos(true);
   };
 
   // Función para obtener ventas de un cliente
@@ -282,13 +318,7 @@ const CustomersPage = () => {
             </div>
             
             <div className="flex flex-wrap gap-3">
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                <Plus size={16} />
-                <span className="font-medium">Nuevo Cliente</span>
-              </button>
+              {/* Los botones se movieron a la sección de filtros */}
             </div>
           </div>
         </div>
@@ -334,7 +364,7 @@ const CustomersPage = () => {
 
       {/* Filtros con diseño sobrio */}
       <div className="max-w-7xl mx-auto px-6 mb-6">
-        <div className="bg-theme-surface rounded-lg border border-theme-border p-4">
+        <div className="bg-theme-surface rounded-lg border border-theme-border p-6">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-theme-textSecondary" />
@@ -358,7 +388,50 @@ const CustomersPage = () => {
                 <option value="activos">Solo activos</option>
                 <option value="inactivos">Solo inactivos</option>
               </select>
+              
+              <button
+                onClick={handleRefresh}
+                disabled={loading || refreshing}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                  refreshing 
+                    ? 'bg-theme-secondary text-theme-textSecondary cursor-not-allowed' 
+                    : 'bg-theme-secondary text-theme-text hover:bg-theme-border'
+                }`}
+                title="Recargar datos"
+              >
+                <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+                <span className="text-sm">{refreshing ? 'Recargando...' : 'Recargar'}</span>
+              </button>
+              
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus size={16} />
+                <span className="text-sm">Nuevo Cliente</span>
+              </button>
             </div>
+          </div>
+          
+          {/* Controles adicionales */}
+          <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center gap-4">
+              <p className="text-sm text-theme-textSecondary">
+                {filteredClientes && Array.isArray(filteredClientes) && filteredClientes.length > 0 
+                  ? `${filteredClientes.length} cliente${filteredClientes.length !== 1 ? 's' : ''} encontrado${filteredClientes.length !== 1 ? 's' : ''}`
+                  : 'No se encontraron clientes'
+                }
+              </p>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={loading || refreshing}
+              className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-text rounded-lg hover:bg-theme-border transition-colors"
+              title="Recargar datos"
+            >
+              <RefreshCw size={16} />
+              <span className="text-sm">Recargar</span>
+            </button>
           </div>
         </div>
       </div>

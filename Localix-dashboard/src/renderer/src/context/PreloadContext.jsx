@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import api from '../api/axios';
 
 // 🚀 CONTEXTO PARA PRE-CARGA INTELIGENTE DE DATOS
 const PreloadContext = createContext();
@@ -6,9 +7,9 @@ const PreloadContext = createContext();
 // 🚀 CONFIGURACIÓN DE PRE-CARGA
 const PRELOAD_CONFIG = {
   // Tiempo de espera antes de iniciar pre-carga (ms)
-  INITIAL_DELAY: 2000,
+  INITIAL_DELAY: 3000,
   // Intervalo entre pre-cargas (ms)
-  REFRESH_INTERVAL: 5 * 60 * 1000, // 5 minutos
+  REFRESH_INTERVAL: 10 * 60 * 1000, // 10 minutos
   // Tiempo máximo de espera para pre-carga (ms)
   TIMEOUT: 10000,
   // Número máximo de intentos de pre-carga
@@ -32,6 +33,9 @@ const PRELOAD_STATES = {
 };
 
 export const PreloadProvider = ({ children }) => {
+  // No usar useAuth aquí para evitar dependencias circulares
+  // En su lugar, verificaremos la autenticación de forma dinámica
+  
   // 🚀 ESTADO PRINCIPAL DE PRE-CARGA
   const [preloadState, setPreloadState] = useState({
     products: { state: PRELOAD_STATES.IDLE, data: null, error: null, lastUpdated: null },
@@ -55,7 +59,8 @@ export const PreloadProvider = ({ children }) => {
 
   // 🚀 FUNCIÓN PARA PRE-CARGAR PRODUCTOS
   const preloadProducts = useCallback(async (priority = PRELOAD_CONFIG.PRIORITIES.MEDIUM) => {
-    if (preloadState.products.state === PRELOAD_STATES.LOADING) {
+    // Verificar si ya está cargando o si hay un request activo
+    if (preloadState.products.state === PRELOAD_STATES.LOADING || abortControllers.products) {
       console.log('🚀 Pre-carga de productos ya en progreso, saltando...');
       return;
     }
@@ -78,11 +83,30 @@ export const PreloadProvider = ({ children }) => {
     try {
       const startTime = Date.now();
       
-      // Usar el handler optimizado para cargar productos y categorías juntos
-      const result = await window.electronAPI.productos.cargarProductosYCategorias({
-        signal: controller.signal,
-        priority
-      });
+      let result;
+      
+      // Verificar autenticación de forma dinámica
+      const token = localStorage.getItem('access_token');
+      const isAuthenticated = !!token;
+      
+      if (isAuthenticated) {
+        console.log('🚀 Usando API HTTP para productos (usuario autenticado)');
+        const response = await api.get('productos/productos/', {
+          params: { 
+            ordering: 'nombre',
+            page_size: 100 // Limitar a 100 productos para preload
+          },
+          signal: controller.signal
+        });
+        result = { products: response.data.results || response.data };
+      } else {
+        // Si no está autenticado, usar IPC
+        console.log('🚀 Usando IPC para productos (usuario no autenticado)');
+        result = await window.electronAPI.productos.cargarProductosYCategorias({
+          signal: controller.signal,
+          priority
+        });
+      }
 
       const loadTime = Date.now() - startTime;
       console.log(`🚀 Productos pre-cargados en ${loadTime}ms`);
@@ -98,7 +122,7 @@ export const PreloadProvider = ({ children }) => {
       }));
 
     } catch (error) {
-      if (error.name === 'AbortError') {
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         console.log('🚀 Pre-carga de productos cancelada');
         return;
       }
@@ -117,7 +141,8 @@ export const PreloadProvider = ({ children }) => {
 
   // 🚀 FUNCIÓN PARA PRE-CARGAR CATEGORÍAS
   const preloadCategories = useCallback(async (priority = PRELOAD_CONFIG.PRIORITIES.HIGH) => {
-    if (preloadState.categories.state === PRELOAD_STATES.LOADING) {
+    // Verificar si ya está cargando o si hay un request activo
+    if (preloadState.categories.state === PRELOAD_STATES.LOADING || abortControllers.categories) {
       console.log('🚀 Pre-carga de categorías ya en progreso, saltando...');
       return;
     }
@@ -154,10 +179,27 @@ export const PreloadProvider = ({ children }) => {
     try {
       const startTime = Date.now();
       
-      const result = await window.electronAPI.categorias.listar({
-        signal: controller.signal,
-        priority
-      });
+      let result;
+      
+      // Verificar autenticación de forma dinámica
+      const token = localStorage.getItem('access_token');
+      const isAuthenticated = !!token;
+      
+      if (isAuthenticated) {
+        console.log('🚀 Usando API HTTP para categorías (usuario autenticado)');
+        const response = await api.get('categorias/', {
+          params: { ordering: 'orden,nombre' },
+          signal: controller.signal
+        });
+        result = response.data.results || response.data;
+      } else {
+        // Si no está autenticado, usar IPC
+        console.log('🚀 Usando IPC para categorías (usuario no autenticado)');
+        result = await window.electronAPI.categorias.listar({
+          signal: controller.signal,
+          priority
+        });
+      }
 
       const loadTime = Date.now() - startTime;
       console.log(`🚀 Categorías pre-cargadas en ${loadTime}ms`);
@@ -173,7 +215,7 @@ export const PreloadProvider = ({ children }) => {
       }));
 
     } catch (error) {
-      if (error.name === 'AbortError') {
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         console.log('🚀 Pre-carga de categorías cancelada');
         return;
       }
@@ -255,13 +297,29 @@ export const PreloadProvider = ({ children }) => {
   const preloadAll = useCallback(async (priority = PRELOAD_CONFIG.PRIORITIES.MEDIUM) => {
     console.log('🚀 Iniciando pre-carga completa de datos');
     
-    // Pre-cargar en paralelo con diferentes prioridades
-    await Promise.allSettled([
-      preloadCategories(PRELOAD_CONFIG.PRIORITIES.HIGH),
-      preloadProducts(PRELOAD_CONFIG.PRIORITIES.MEDIUM),
-      preloadDashboard(PRELOAD_CONFIG.PRIORITIES.LOW)
-    ]);
-  }, [preloadCategories, preloadProducts, preloadDashboard]);
+    // Verificar si ya hay requests activos
+    const hasActiveRequests = Object.values(preloadState).some(
+      state => state.state === PRELOAD_STATES.LOADING
+    );
+    
+    if (hasActiveRequests) {
+      console.log('🚀 Saltando pre-carga completa - requests activos en progreso');
+      return;
+    }
+    
+    // Pre-cargar en secuencia para evitar conflictos
+    try {
+      await preloadCategories(PRELOAD_CONFIG.PRIORITIES.HIGH);
+      // Pequeña pausa entre requests
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await preloadProducts(PRELOAD_CONFIG.PRIORITIES.MEDIUM);
+      // Pequeña pausa entre requests
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await preloadDashboard(PRELOAD_CONFIG.PRIORITIES.LOW);
+    } catch (error) {
+      console.log('🚀 Error en pre-carga completa:', error);
+    }
+  }, [preloadCategories, preloadProducts, preloadDashboard, preloadState]);
 
   // 🚀 FUNCIÓN PARA FORZAR REFRESH
   const forceRefresh = useCallback(async (dataType = 'all') => {
@@ -315,12 +373,21 @@ export const PreloadProvider = ({ children }) => {
       preloadAll();
     }, PRELOAD_CONFIG.INITIAL_DELAY);
 
-    // Pre-carga periódica
+    // Pre-carga periódica solo si autoRefresh está habilitado
     let refreshTimer;
     if (config.autoRefresh) {
       refreshTimer = setInterval(() => {
-        console.log('🚀 Ejecutando pre-carga periódica');
-        preloadAll();
+        // Solo ejecutar pre-carga periódica si no hay requests en progreso
+        const hasActiveRequests = Object.values(preloadState).some(
+          state => state.state === PRELOAD_STATES.LOADING
+        );
+        
+        if (!hasActiveRequests) {
+          console.log('🚀 Ejecutando pre-carga periódica');
+          preloadAll();
+        } else {
+          console.log('🚀 Saltando pre-carga periódica - requests activos en progreso');
+        }
       }, PRELOAD_CONFIG.REFRESH_INTERVAL);
     }
 
@@ -333,7 +400,7 @@ export const PreloadProvider = ({ children }) => {
         if (controller) controller.abort();
       });
     };
-  }, [config.isEnabled, config.autoRefresh, preloadAll, abortControllers]);
+  }, [config.isEnabled, config.autoRefresh, preloadAll, abortControllers, preloadState]);
 
   // 🚀 VALOR DEL CONTEXTO
   const contextValue = useMemo(() => ({

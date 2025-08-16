@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import OrderStatusBadge from '../components/OrderStatusBadge';
 import DashboardSkeleton from '../components/ui/DashboardSkeleton';
-import useDashboard from '../hooks/useDashboard';
+import useDashboardOptimized from '../hooks/useDashboardOptimized';
 import { useTheme } from '../hooks/useTheme';
 import clsx from 'clsx';
 
@@ -21,7 +21,7 @@ const PieChart = lazy(() => import('../components/charts/PieChart'));
 
 const DashboardPage = React.memo(() => {
   const navigate = useNavigate();
-  const { dashboardData, loading, error, refreshData } = useDashboard();
+  const { dashboardData, loading, error, refreshData, isAuthenticated } = useDashboardOptimized();
   const { currentTheme } = useTheme();
 
   // KPIs optimizados desde resumen
@@ -128,8 +128,16 @@ const DashboardPage = React.memo(() => {
     }));
   }, [dashboardData.pedidosRecientes]);
 
-  // Botones de acción rápida - MÁS PEQUEÑOS Y SOBRIOS
+  // Botones de acción rápida - MEJOR DISTRIBUIDOS
   const quickActions = [
+    {
+      id: 'quick-sale',
+      title: 'Venta Rápida',
+      icon: <ShoppingCart className="w-5 h-5" />,
+      color: 'bg-green-50 text-green-700 border-green-200',
+      hoverColor: 'hover:bg-green-100',
+      action: () => navigate('/quick-sales')
+    },
     {
       id: 'new-product',
       title: 'Nuevo Producto',
@@ -137,14 +145,6 @@ const DashboardPage = React.memo(() => {
       color: 'bg-blue-50 text-blue-700 border-blue-200',
       hoverColor: 'hover:bg-blue-100',
       action: () => navigate('/product/new')
-    },
-    {
-      id: 'quick-sale',
-      title: 'Venta Rápida',
-      icon: <ShoppingCart className="w-5 h-5" />,
-                  color: 'bg-blue-50 text-blue-700 border-blue-200',
-            hoverColor: 'hover:bg-blue-100',
-      action: () => navigate('/quick-sales')
     },
     {
       id: 'view-orders',
@@ -180,6 +180,26 @@ const DashboardPage = React.memo(() => {
     }
   ];
 
+  // Verificar autenticación
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-theme-background">
+        <AlertTriangle className="w-12 h-12 text-yellow-500 mb-4" />
+        <h2 className="text-xl font-semibold text-theme-text mb-2">No autenticado</h2>
+        <p className="text-theme-textSecondary mb-4 text-center max-w-md">
+          Por favor inicia sesión para ver los datos del dashboard.
+        </p>
+        <button
+          onClick={() => navigate('/login')}
+          className="bg-theme-primary hover:bg-theme-accent text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+        >
+          <UserPlus className="w-4 h-4" />
+          Ir al Login
+        </button>
+      </div>
+    );
+  }
+
   // Loader optimizado
   if (loading.initial) {
     return <DashboardSkeleton />;
@@ -205,7 +225,7 @@ const DashboardPage = React.memo(() => {
 
   return (
     <div className="min-h-screen bg-theme-background">
-      {/* Header más limpio */}
+      {/* Header mejorado */}
       <div className="bg-theme-surface border-b border-theme-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
@@ -217,7 +237,7 @@ const DashboardPage = React.memo(() => {
             <button 
               onClick={refreshData}
               disabled={loading.refresh}
-              className="flex items-center gap-2 px-3 py-2 text-sm bg-theme-surface border border-theme-border rounded-lg hover:bg-theme-primary hover:text-white transition-colors text-theme-text"
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-theme-surface border border-theme-border rounded-lg hover:bg-theme-primary hover:text-white transition-colors text-theme-text"
             >
               <RefreshCw className={`h-4 w-4 ${loading.refresh ? 'animate-spin' : ''}`} />
               Actualizar
@@ -226,102 +246,104 @@ const DashboardPage = React.memo(() => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* KPIs más sobrios pero con color */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* KPIs - MEJOR DISTRIBUIDOS Y ESPACIADOS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 mb-8">
           {/* Ingresos de Pedidos Confirmados */}
-          <div className="bg-theme-surface rounded-lg border border-theme-border p-4 hover:shadow-md transition-shadow">
+          <div className="bg-theme-surface rounded-xl border border-theme-border p-6 hover:shadow-lg transition-all duration-200">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                                  <p className="text-sm font-medium text-theme-textSecondary">Ingresos Entregados</p>
-                <p className="text-2xl font-bold text-theme-text mt-1">
+                <p className="text-sm font-medium text-theme-textSecondary mb-1">Ingresos Entregados</p>
+                <p className="text-2xl font-bold text-theme-text">
                   ${totalIngresos.toLocaleString('es-CO', {minimumFractionDigits: 2})}
                 </p>
-                <div className="flex items-center mt-2 text-theme-accent text-xs">
+                <div className="flex items-center mt-2 text-green-600 text-xs">
                   <CheckCircle className="w-3 h-3 mr-1" />
-                  <span>{pedidosEntregados} pedidos entregados</span>
+                  <span>{pedidosEntregados} entregados</span>
                 </div>
               </div>
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <DollarSign className="w-6 h-6 text-blue-600" />
+              <div className="p-3 bg-green-100 rounded-xl">
+                <DollarSign className="w-6 h-6 text-green-600" />
               </div>
             </div>
           </div>
 
           {/* Pedidos */}
-          <div className="bg-theme-surface rounded-lg border border-theme-border p-4 hover:shadow-md transition-shadow">
+          <div className="bg-theme-surface rounded-xl border border-theme-border p-6 hover:shadow-lg transition-all duration-200">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm font-medium text-theme-textSecondary">Pedidos</p>
-                <p className="text-2xl font-bold text-theme-text mt-1">{totalPedidos}</p>
-                <div className="flex items-center mt-2 text-theme-accent text-xs">
+                <p className="text-sm font-medium text-theme-textSecondary mb-1">Total Pedidos</p>
+                <p className="text-2xl font-bold text-theme-text">{totalPedidos}</p>
+                <div className="flex items-center mt-2 text-blue-600 text-xs">
                   <ArrowUp className="w-3 h-3 mr-1" />
                   <span>+8 esta semana</span>
                 </div>
               </div>
-              <div className="p-2 bg-blue-100 rounded-lg">
+              <div className="p-3 bg-blue-100 rounded-xl">
                 <ShoppingBag className="w-6 h-6 text-blue-600" />
               </div>
             </div>
           </div>
 
           {/* Productos */}
-          <div className="bg-theme-surface rounded-lg border border-theme-border p-4 hover:shadow-md transition-shadow">
+          <div className="bg-theme-surface rounded-xl border border-theme-border p-6 hover:shadow-lg transition-all duration-200">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm font-medium text-theme-textSecondary">Productos</p>
-                <p className="text-2xl font-bold text-theme-text mt-1">{totalProductos}</p>
+                <p className="text-sm font-medium text-theme-textSecondary mb-1">Productos</p>
+                <p className="text-2xl font-bold text-theme-text">{totalProductos}</p>
                 <p className="text-xs text-theme-textSecondary mt-2">En catálogo</p>
               </div>
-              <div className="p-2 bg-purple-100 rounded-lg">
+              <div className="p-3 bg-purple-100 rounded-xl">
                 <Package className="w-6 h-6 text-purple-600" />
               </div>
             </div>
           </div>
 
           {/* Clientes */}
-          <div className="bg-theme-surface rounded-lg border border-theme-border p-4 hover:shadow-md transition-shadow">
+          <div className="bg-theme-surface rounded-xl border border-theme-border p-6 hover:shadow-lg transition-all duration-200">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm font-medium text-theme-textSecondary">Clientes</p>
-                <p className="text-2xl font-bold text-theme-text mt-1">{totalClientes}</p>
+                <p className="text-sm font-medium text-theme-textSecondary mb-1">Clientes</p>
+                <p className="text-2xl font-bold text-theme-text">{totalClientes}</p>
                 <p className="text-xs text-theme-textSecondary mt-2">Base activa</p>
               </div>
-              <div className="p-2 bg-orange-100 rounded-lg">
+              <div className="p-3 bg-orange-100 rounded-xl">
                 <Users className="w-6 h-6 text-orange-600" />
               </div>
             </div>
           </div>
 
-          {/* Pedidos Entregados */}
-          <div className="bg-theme-surface rounded-lg border border-theme-border p-4 hover:shadow-md transition-shadow">
+          {/* Ticket Promedio */}
+          <div className="bg-theme-surface rounded-xl border border-theme-border p-6 hover:shadow-lg transition-all duration-200">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm font-medium text-theme-textSecondary">Pedidos Entregados</p>
-                <p className="text-2xl font-bold text-theme-text mt-1">{pedidosEntregados}</p>
-                <div className="flex items-center mt-2 text-theme-accent text-xs">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  <span>Completados</span>
+                <p className="text-sm font-medium text-theme-textSecondary mb-1">Ticket Promedio</p>
+                <p className="text-2xl font-bold text-theme-text">
+                  ${ticketPromedio.toLocaleString('es-CO', {minimumFractionDigits: 2})}
+                </p>
+                <div className="flex items-center mt-2 text-indigo-600 text-xs">
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                  <span>Por venta</span>
                 </div>
               </div>
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Package className="w-6 h-6 text-blue-600" />
+              <div className="p-3 bg-indigo-100 rounded-xl">
+                <CreditCard className="w-6 h-6 text-indigo-600" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Botones de Acción Rápida - PEQUEÑOS Y SOBRIOS */}
+        {/* Botones de Acción Rápida - MEJOR DISTRIBUIDOS */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-theme-text mb-4">Acciones Rápidas</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {quickActions.map((action) => (
               <button
                 key={action.id}
                 onClick={action.action}
-                className={`p-3 border rounded-lg ${action.color} ${action.hoverColor} transition-colors text-center text-sm font-medium`}
+                className={`p-4 border-2 rounded-xl ${action.color} ${action.hoverColor} transition-all duration-200 text-center text-sm font-medium hover:scale-105 hover:shadow-md`}
               >
-                <div className="flex flex-col items-center space-y-1">
+                <div className="flex flex-col items-center space-y-2">
                   {action.icon}
                   <span>{action.title}</span>
                 </div>
@@ -330,24 +352,24 @@ const DashboardPage = React.memo(() => {
           </div>
         </div>
 
-        {/* Gráficos más sobrios */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Gráficos - MEJOR ESPACIADOS */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Gráfico de Ventas */}
-          <div className="bg-theme-surface rounded-lg border border-theme-border p-4">
-            <div className="flex justify-between items-center mb-4">
+          <div className="bg-theme-surface rounded-xl border border-theme-border p-6">
+            <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-semibold text-theme-text">Tendencia de Ventas</h3>
-              <Calendar className="w-4 h-4 text-theme-textSecondary" />
+              <Calendar className="w-5 h-5 text-theme-textSecondary" />
             </div>
-            <div className="h-64">
+            <div className="h-72">
               {salesData.labels.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-theme-textSecondary">
                   <div className="text-center">
-                    <LineChart className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <LineChart className="w-12 h-12 mx-auto mb-3 opacity-50" />
                     <p className="text-sm">No hay datos disponibles</p>
                   </div>
                 </div>
               ) : (
-                <Suspense fallback={<div className="h-64 bg-theme-secondary animate-pulse rounded"></div>}>
+                <Suspense fallback={<div className="h-72 bg-theme-secondary animate-pulse rounded-lg"></div>}>
                   <BarChart 
                     data={salesData} 
                     options={{ 
@@ -372,21 +394,21 @@ const DashboardPage = React.memo(() => {
           </div>
 
           {/* Estado del Inventario */}
-          <div className="bg-theme-surface rounded-lg border border-theme-border p-4">
-            <div className="flex justify-between items-center mb-4">
+          <div className="bg-theme-surface rounded-xl border border-theme-border p-6">
+            <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-semibold text-theme-text">Estado del Inventario</h3>
-              <Activity className="w-4 h-4 text-theme-textSecondary" />
+              <Activity className="w-5 h-5 text-theme-textSecondary" />
             </div>
-            <div className="h-64">
+            <div className="h-72">
               {inventoryData.labels.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-theme-textSecondary">
                   <div className="text-center">
-                    <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
                     <p className="text-sm">No hay datos disponibles</p>
                   </div>
                 </div>
               ) : (
-                <Suspense fallback={<div className="h-64 bg-theme-secondary animate-pulse rounded"></div>}>
+                <Suspense fallback={<div className="h-72 bg-theme-secondary animate-pulse rounded-lg"></div>}>
                   <PieChart 
                     data={inventoryData} 
                     options={{ 
@@ -410,14 +432,14 @@ const DashboardPage = React.memo(() => {
           </div>
         </div>
 
-        {/* Pedidos Recientes más sobrio */}
-        <div className="bg-theme-surface rounded-lg border border-theme-border">
-          <div className="p-4 border-b border-theme-border">
+        {/* Pedidos Recientes - MEJOR DISEÑO */}
+        <div className="bg-theme-surface rounded-xl border border-theme-border overflow-hidden">
+          <div className="p-6 border-b border-theme-border">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-theme-text">Pedidos Recientes</h3>
               <button 
                 onClick={() => navigate('/orders')}
-                className="text-sm text-theme-accent hover:text-opacity-80 font-medium"
+                className="text-sm text-theme-accent hover:text-opacity-80 font-medium transition-colors"
               >
                 Ver todos
               </button>
@@ -425,13 +447,13 @@ const DashboardPage = React.memo(() => {
           </div>
           
           {recentOrders.length === 0 ? (
-            <div className="p-8 text-center">
-              <ShoppingBag className="w-12 h-12 text-theme-textSecondary mx-auto mb-3" />
-                              <h4 className="text-base font-medium text-theme-text mb-2">No hay pedidos recientes</h4>
-                <p className="text-theme-textSecondary text-sm mb-4">Los nuevos pedidos aparecerán aquí</p>
+            <div className="p-12 text-center">
+              <ShoppingBag className="w-16 h-16 text-theme-textSecondary mx-auto mb-4" />
+              <h4 className="text-lg font-medium text-theme-text mb-2">No hay pedidos recientes</h4>
+              <p className="text-theme-textSecondary text-sm mb-6">Los nuevos pedidos aparecerán aquí</p>
               <button 
                 onClick={() => navigate('/quick-sales')}
-                className="bg-theme-primary hover:bg-theme-accent text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="bg-theme-primary hover:bg-theme-accent text-white px-6 py-3 rounded-lg text-sm font-medium transition-colors"
               >
                 Crear primera venta
               </button>
@@ -441,25 +463,25 @@ const DashboardPage = React.memo(() => {
               <table className="min-w-full">
                 <thead className="bg-theme-secondary">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase">Pedido</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase">Cliente</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase">Fecha</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase">Monto</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase">Estado</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">Pedido</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">Cliente</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">Fecha</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">Monto</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">Estado</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-theme-border">
                   {recentOrders.map((order) => (
-                    <tr key={order.id} className="hover:bg-theme-secondary cursor-pointer" onClick={() => navigate('/orders')}>
-                      <td className="px-4 py-3 text-sm font-medium text-theme-text">#{order.id}</td>
-                      <td className="px-4 py-3 text-sm text-theme-textSecondary">{order.customer}</td>
-                      <td className="px-4 py-3 text-sm text-theme-textSecondary">
+                    <tr key={order.id} className="hover:bg-theme-secondary cursor-pointer transition-colors" onClick={() => navigate('/orders')}>
+                      <td className="px-6 py-4 text-sm font-medium text-theme-text">#{order.id}</td>
+                      <td className="px-6 py-4 text-sm text-theme-textSecondary">{order.customer}</td>
+                      <td className="px-6 py-4 text-sm text-theme-textSecondary">
                         {new Date(order.date).toLocaleDateString('es-ES')}
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-theme-text">
+                      <td className="px-6 py-4 text-sm font-medium text-theme-text">
                         ${typeof order.amount === 'number' ? order.amount.toFixed(2) : (parseFloat(order.amount) || 0).toFixed(2)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-6 py-4">
                         <OrderStatusBadge status={order.status} />
                       </td>
                     </tr>

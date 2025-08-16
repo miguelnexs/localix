@@ -1,13 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import api from '../../api/axios';
 import {
   Search, Plus, RefreshCw, Eye, Edit, Trash2,
   FolderOpen, Filter, ArrowUpDown, ChevronDown, ChevronUp,
-  CheckCircle, Edit as EditIcon, AlertTriangle, XCircle, TrendingUp, Folder
+  CheckCircle, Edit as EditIcon, AlertTriangle, XCircle, TrendingUp, Folder, Package
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import CategoriaForm from './CategoriaForm';
 import EmptyState from './EmptyState';
 import { useToast } from '../../hooks/useToast';
+import { RESOURCE_URL } from '../../api/apiConfig';
+
+// Función para obtener URL de imagen
+function getImageUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  return `${RESOURCE_URL}${url}`;
+}
+
+// Componentes UI estandarizados
+import DataTable from '../ui/DataTable';
+import ActionButtons from '../ui/ActionButtons';
 import { useDeleteConfirmation } from '../../hooks/useDeleteConfirmation';
 import DeleteConfirmationModal from '../ui/DeleteConfirmationModal';
 
@@ -52,7 +65,21 @@ const CategoriasList = () => {
       setLoading(prev => ({ ...prev, categorias: true }));
       setUi(prev => ({ ...prev, error: null }));
       
-      const response = await window.electronAPI.categorias.listar();
+      // Verificar si el usuario está autenticado para usar HTTP directo o IPC
+      const token = localStorage.getItem('access_token');
+      const isAuthenticated = !!token;
+      
+      let response;
+      if (isAuthenticated) {
+        // Usar llamada HTTP directa
+        const apiResponse = await api.get('categorias/', { 
+          params: { ordering: 'orden,nombre' } 
+        });
+        response = apiResponse.data.results || apiResponse.data; // Extraer los datos de la respuesta HTTP
+      } else {
+        // Usar IPC si no está autenticado
+        response = await window.electronAPI.categorias.listar();
+      }
       const categoriasData = Array.isArray(response) ? response : [];
       
       setData({
@@ -173,7 +200,17 @@ const CategoriasList = () => {
   const handleDelete = async (slug, categoryName) => {
     const success = await confirmDeleteCategory(
       async () => {
-        await window.electronAPI.categorias.eliminar(slug);
+        // Verificar si el usuario está autenticado para usar HTTP directo o IPC
+        const token = localStorage.getItem('access_token');
+        const isAuthenticated = !!token;
+        
+        if (isAuthenticated) {
+          // Usar llamada HTTP directa
+          await api.delete(`categorias/${slug}/`);
+        } else {
+          // Usar IPC si no está autenticado
+          await window.electronAPI.categorias.eliminar(slug);
+        }
         fetchCategorias();
       },
       categoryName
@@ -183,6 +220,82 @@ const CategoriasList = () => {
       setUi(prev => ({ ...prev, error: 'Error al eliminar la categoría' }));
     }
   };
+
+  // Configuración de columnas para la tabla estandarizada
+  const getCategoriaColumns = (onView, onEdit, onDelete) => [
+    {
+      key: 'nombre',
+      label: 'Categoría',
+      sortable: true,
+      render: (categoria) => (
+        <div className="flex items-center space-x-3">
+          <div className="flex-shrink-0 w-8 h-8">
+            {categoria.imagen ? (
+              <img
+                src={getImageUrl(categoria.imagen)}
+                alt={categoria.nombre}
+                className="w-8 h-8 rounded-lg object-cover"
+                loading="lazy"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <div className={`w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center ${categoria.imagen ? 'hidden' : ''}`}>
+              <Folder className="w-4 h-4 text-blue-600" />
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-theme-text truncate">
+              {categoria.nombre}
+            </p>
+            <p className="text-xs text-theme-textSecondary truncate">
+              {categoria.descripcion || 'Sin descripción'}
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'productos_count',
+      label: 'Productos',
+      sortable: true,
+      render: (categoria) => (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+          {categoria.productos_count || 0}
+        </span>
+      )
+    },
+    {
+      key: 'stock_total_categoria',
+      label: 'Stock Total',
+      sortable: true,
+      render: (categoria) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          (categoria.stock_total_categoria || 0) > 0 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {categoria.stock_total_categoria || 0}
+        </span>
+      )
+    },
+    {
+      key: 'acciones',
+      label: 'Acciones',
+      sortable: false,
+      render: (categoria) => (
+        <ActionButtons
+          onView={() => openDialogFor(categoria, 'view')}
+          onEdit={() => openDialogFor(categoria, 'edit')}
+          onDelete={() => handleDelete(categoria.slug, categoria.nombre)}
+          size="sm"
+          variant="compact"
+        />
+      )
+    }
+  ];
 
   // Componentes renderizados condicionalmente
   const renderLoadingState = () => (
@@ -349,16 +462,7 @@ const CategoriasList = () => {
             </div>
             
             <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => {
-                  setData(prev => ({ ...prev, selectedCategoria: null }));
-                  setUi(prev => ({ ...prev, openDialog: true, dialogMode: 'edit' }));
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                <Plus size={16} />
-                <span className="font-medium">Nueva Categoría</span>
-              </button>
+              {/* Los botones se movieron a la sección de filtros */}
             </div>
           </div>
         </div>
@@ -404,7 +508,7 @@ const CategoriasList = () => {
 
       {/* Filtros con diseño sobrio */}
       <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="bg-theme-surface rounded-lg border border-theme-border p-4">
+        <div className="bg-theme-surface rounded-lg border border-theme-border p-6">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-theme-textSecondary" />
@@ -420,102 +524,54 @@ const CategoriasList = () => {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleRefresh}
-                className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-textSecondary rounded-lg hover:bg-theme-border transition-colors"
+                disabled={loading.categorias}
+                className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-textSecondary rounded-lg hover:bg-theme-border transition-colors disabled:opacity-50"
                 title="Refrescar"
               >
-                <RefreshCw size={16} />
+                <RefreshCw className={`w-4 h-4 ${loading.categorias ? 'animate-spin' : ''}`} />
                 <span className="text-sm">Refrescar</span>
               </button>
+              
+              <button
+                onClick={() => {
+                  setData(prev => ({ ...prev, selectedCategoria: null }));
+                  setUi(prev => ({ ...prev, openDialog: true, dialogMode: 'edit' }));
+                }}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus size={16} />
+                <span className="text-sm">Nueva Categoría</span>
+              </button>
+            </div>
+          </div>
+          
+          {/* Controles adicionales */}
+          <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center gap-4">
+              <p className="text-sm text-theme-textSecondary">
+                {filteredCategorias && Array.isArray(filteredCategorias) && filteredCategorias.length > 0 
+                  ? `${filteredCategorias.length} categoría${filteredCategorias.length !== 1 ? 's' : ''} encontrada${filteredCategorias.length !== 1 ? 's' : ''}`
+                  : 'No se encontraron categorías'
+                }
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tabla de Categorías con diseño sobrio */}
+      {/* Tabla de Categorías estandarizada */}
       <div className="max-w-7xl mx-auto px-6 mb-6">
-        <div className="bg-theme-surface rounded-lg border border-theme-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-theme-background">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider cursor-pointer hover:bg-theme-secondary transition-colors"
-                      onClick={() => requestSort('nombre')}>
-                    <div className="flex items-center">
-                      Categoría
-                      {getSortIcon('nombre')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider cursor-pointer hover:bg-theme-secondary transition-colors"
-                      onClick={() => requestSort('slug')}>
-                    <div className="flex items-center">
-                      Slug
-                      {getSortIcon('slug')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider cursor-pointer hover:bg-theme-secondary transition-colors"
-                      onClick={() => requestSort('orden')}>
-                    <div className="flex items-center">
-                      Orden
-                      {getSortIcon('orden')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider cursor-pointer hover:bg-theme-secondary transition-colors"
-                      onClick={() => requestSort('stock_total_categoria')}>
-                    <div className="flex items-center">
-                      Stock Total
-                      {getSortIcon('stock_total_categoria')}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-theme-surface divide-y divide-theme-border">
-                {loading.categorias ? (
-                  // Skeleton loading
-                  Array.from({ length: 5 }).map((_, index) => (
-                    <tr key={`skeleton-${index}`}>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 bg-theme-border rounded-lg animate-pulse"></div>
-                          <div className="ml-3">
-                            <div className="h-4 bg-theme-border rounded animate-pulse w-32"></div>
-                            <div className="h-3 bg-theme-border rounded animate-pulse w-24 mt-2"></div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="h-4 bg-theme-border rounded animate-pulse w-16"></div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="h-6 bg-theme-border rounded animate-pulse w-16"></div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="h-6 bg-theme-border rounded animate-pulse w-12"></div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex space-x-2">
-                          <div className="h-6 bg-theme-border rounded animate-pulse w-12"></div>
-                          <div className="h-6 bg-theme-border rounded animate-pulse w-12"></div>
-                          <div className="h-6 bg-theme-border rounded animate-pulse w-12"></div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : filteredCategorias.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-12">
-                      {renderEmptyState()}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredCategorias.map(renderCategoriaRow)
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable
+          columns={getCategoriaColumns(openDialogFor, openDialogFor, handleDelete)}
+          data={filteredCategorias}
+          sortConfig={sortConfig}
+          onSort={requestSort}
+          loading={loading.categorias}
+          emptyMessage="No hay categorías disponibles"
+          size="md"
+          striped={true}
+          hover={true}
+        />
       </div>
 
       {/* Formulario de Categoría en Modal */}

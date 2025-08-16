@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../../api/axios';
 import {
   Dialog,
   DialogTitle,
@@ -97,11 +98,12 @@ const CategoriaForm = ({ open, onClose, categoria, onCreateSuccess, onUpdateSucc
       setFormData(prev => ({
         ...prev,
         imagen: {
+          file: file, // Guardar el archivo original para HTTP
           name: file.name,
           type: file.type,
           size: file.size,
           lastModified: file.lastModified,
-          data: e.target.result.split(',')[1] // base64 puro
+          data: e.target.result.split(',')[1] // base64 puro para IPC
         }
       }));
       setError(null);
@@ -131,30 +133,89 @@ const CategoriaForm = ({ open, onClose, categoria, onCreateSuccess, onUpdateSucc
     setError(null);
 
     try {
-      // Construir objeto plano para Electron
-      const categoriaData = {
-        nombre: nombreTrim,
-        descripcion: (formData.descripcion || '').trim(),
-        activa: !!formData.activa,
-        imagen: formData.imagen ? {
-          name: formData.imagen.name,
-          type: formData.imagen.type,
-          size: formData.imagen.size,
-          lastModified: formData.imagen.lastModified,
-          data: formData.imagen.data // base64 puro
-        } : undefined
-      };
+      // Verificar si el usuario está autenticado para usar HTTP directo o IPC
+      const token = localStorage.getItem('access_token');
+      const isAuthenticated = !!token;
+      
 
+      
       let response;
-      if (categoria) {
-        response = await window.electronAPI.categorias.actualizar({
-          slug: categoria.slug,
-          data: categoriaData
-        });
-        onUpdateSuccess(response);
+      if (isAuthenticated) {
+        // Usar llamadas HTTP directas
+        if (categoria) {
+          // Para actualización, usar FormData si hay imagen
+          if (formData.imagen) {
+            const formDataToSend = new FormData();
+            formDataToSend.append('nombre', nombreTrim);
+            formDataToSend.append('descripcion', (formData.descripcion || '').trim());
+            formDataToSend.append('activa', formData.activa);
+            formDataToSend.append('imagen', formData.imagen.file); // Usar el archivo original
+            
+
+            
+            const apiResponse = await api.put(`categorias/${categoria.slug}/`, formDataToSend);
+            response = apiResponse.data;
+          } else {
+            // Sin imagen, usar JSON
+            const categoriaData = {
+              nombre: nombreTrim,
+              descripcion: (formData.descripcion || '').trim(),
+              activa: !!formData.activa,
+            };
+            const apiResponse = await api.put(`categorias/${categoria.slug}/`, categoriaData);
+            response = apiResponse.data;
+          }
+          onUpdateSuccess(response);
+        } else {
+          // Para creación, usar FormData si hay imagen
+          if (formData.imagen) {
+            const formDataToSend = new FormData();
+            formDataToSend.append('nombre', nombreTrim);
+            formDataToSend.append('descripcion', (formData.descripcion || '').trim());
+            formDataToSend.append('activa', formData.activa);
+            formDataToSend.append('imagen', formData.imagen.file); // Usar el archivo original
+            
+
+            
+            const apiResponse = await api.post('categorias/', formDataToSend);
+            response = apiResponse.data;
+          } else {
+            // Sin imagen, usar JSON
+            const categoriaData = {
+              nombre: nombreTrim,
+              descripcion: (formData.descripcion || '').trim(),
+              activa: !!formData.activa,
+            };
+            const apiResponse = await api.post('categorias/', categoriaData);
+            response = apiResponse.data;
+          }
+          onCreateSuccess(response);
+        }
       } else {
-        response = await window.electronAPI.categorias.crear(categoriaData);
-        onCreateSuccess(response);
+        // Usar IPC si no está autenticado
+        const categoriaData = {
+          nombre: nombreTrim,
+          descripcion: (formData.descripcion || '').trim(),
+          activa: !!formData.activa,
+          imagen: formData.imagen ? {
+            name: formData.imagen.name,
+            type: formData.imagen.type,
+            size: formData.imagen.size,
+            lastModified: formData.imagen.lastModified,
+            data: formData.imagen.data // base64 puro
+          } : undefined
+        };
+        
+        if (categoria) {
+          response = await window.electronAPI.categorias.actualizar({
+            slug: categoria.slug,
+            data: categoriaData
+          });
+          onUpdateSuccess(response);
+        } else {
+          response = await window.electronAPI.categorias.crear(categoriaData);
+          onCreateSuccess(response);
+        }
       }
       onClose();
     } catch (err) {
@@ -163,11 +224,34 @@ const CategoriaForm = ({ open, onClose, categoria, onCreateSuccess, onUpdateSucc
       console.error('Error details:', {
         message: err.message,
         stack: err.stack,
-        name: err.name
+        name: err.name,
+        response: err.response?.data
       });
+      
       let errorMessage = 'Error al guardar la categoría';
-      if (err.message) {
+      
+      // Verificar si hay respuesta del servidor con detalles específicos
+      if (err.response?.data) {
+        console.log('Respuesta del servidor:', err.response.data);
+        
+        // Manejar errores específicos del backend
+        if (err.response.data.nombre) {
+          errorMessage = err.response.data.nombre[0] || 'Error en el nombre de la categoría';
+        } else if (err.response.data.descripcion) {
+          errorMessage = err.response.data.descripcion[0] || 'Error en la descripción';
+        } else if (err.response.data.imagen) {
+          errorMessage = err.response.data.imagen[0] || 'Error en la imagen';
+        } else if (err.response.data.error) {
+          errorMessage = err.response.data.error;
+        } else if (typeof err.response.data === 'string') {
+          errorMessage = err.response.data;
+        } else if (err.response.data.message) {
+          errorMessage = err.response.data.message;
+        }
+      } else if (err.message) {
         console.log('Mensaje de error original:', err.message);
+        
+        // Manejar errores genéricos
         if (err.message.includes('Category name is required') || 
             err.message.includes('required') ||
             err.message.includes('nombre') ||
@@ -176,10 +260,16 @@ const CategoriaForm = ({ open, onClose, categoria, onCreateSuccess, onUpdateSucc
         } else if (err.message.includes('Ya existe') || 
                    err.message.includes('already exists')) {
           errorMessage = 'Ya existe una categoría con este nombre';
+        } else if (err.message.includes('Network Error') ||
+                   err.message.includes('timeout')) {
+          errorMessage = 'Error de conexión. Verifica tu conexión a internet.';
+        } else if (err.message.includes('401')) {
+          errorMessage = 'Sesión expirada. Por favor, inicia sesión nuevamente.';
         } else {
           errorMessage = err.message;
         }
       }
+      
       setError(errorMessage);
     } finally {
       setLoading(false);

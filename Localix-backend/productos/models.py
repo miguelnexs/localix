@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from decimal import Decimal
 from django.core.validators import MinValueValidator
@@ -22,10 +23,17 @@ class Producto(models.Model):
         ('descontinuado', _('Descontinuado')),
     ]
 
+    # Campo para multi-tenancy
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        verbose_name=_("Usuario propietario"),
+        help_text=_("Usuario que posee este producto")
+    )
+
     # Identificación básica
     sku = models.CharField(
         max_length=50,
-        unique=True,
         verbose_name=_("SKU"),
         help_text=_("Código único de identificación del producto")
     )
@@ -38,7 +46,6 @@ class Producto(models.Model):
     
     slug = models.SlugField(
         max_length=220,
-        unique=True,
         verbose_name=_("Slug para URL")
     )
     
@@ -246,11 +253,11 @@ class Producto(models.Model):
         verbose_name_plural = _("Productos")
         ordering = ['-fecha_creacion']
         indexes = [
-            models.Index(fields=['sku']),
-            models.Index(fields=['nombre']),
-            models.Index(fields=['precio']),
-            models.Index(fields=['categoria']),
-            models.Index(fields=['estado']),
+            models.Index(fields=['usuario', 'sku']),
+            models.Index(fields=['usuario', 'nombre']),
+            models.Index(fields=['usuario', 'precio']),
+            models.Index(fields=['usuario', 'categoria']),
+            models.Index(fields=['usuario', 'estado']),
         ]
         constraints = [
             models.CheckConstraint(

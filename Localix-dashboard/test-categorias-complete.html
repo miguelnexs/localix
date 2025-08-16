@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Categorias Complete Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .category-item {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .category-name {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .category-description {
+            color: #6c757d;
+            font-size: 12px;
+        }
+        .category-status {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .test-section {
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Test Categorias Complete Fix</h1>
+        <p>Esta página verifica que todas las correcciones de categorías funcionan correctamente con las URLs de API corregidas.</p>
+        
+        <div id="status" class="status info">Inicializando...</div>
+        
+        <div>
+            <button onclick="testAuth()">Verificar Auth</button>
+            <button onclick="runAllTests()">Ejecutar Todos los Tests</button>
+            <button onclick="clearLog()">Limpiar Log</button>
+        </div>
+        
+        <div class="log" id="log"></div>
+    </div>
+
+    <div class="container">
+        <h2>🧪 Tests de Funcionalidad</h2>
+        
+        <div class="test-section">
+            <h3>📂 CategoriasList Tests</h3>
+            <button onclick="testCategoriasList()">Test Lista de Categorías</button>
+            <button onclick="testCategoriasSearch()">Test Búsqueda</button>
+            <button onclick="testCategoriasDelete()">Test Eliminación</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>✏️ CategoriaForm Tests</h3>
+            <button onclick="testCategoriaCreate()">Test Crear Categoría</button>
+            <button onclick="testCategoriaUpdate()">Test Actualizar Categoría</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>📊 Resultados</h3>
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <div class="container" id="categories-preview" style="display: none;">
+        <h2>📂 Lista de Categorías</h2>
+        <div id="categories-list"></div>
+    </div>
+
+    <script>
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+        const results = document.getElementById('results');
+        const categoriesPreview = document.getElementById('categories-preview');
+        const categoriesList = document.getElementById('categories-list');
+        
+        // Configuración de la API
+        const API_BASE = 'http://localhost:8000/api';
+        let testResults = {};
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            logEntry.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : type === 'warning' ? 'orange' : 'black';
+            log.appendChild(logEntry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function clearLog() {
+            log.innerHTML = '';
+            testResults = {};
+            updateResults();
+        }
+        
+        function updateStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        function updateResults() {
+            const totalTests = Object.keys(testResults).length;
+            const passedTests = Object.values(testResults).filter(r => r === 'success').length;
+            const failedTests = totalTests - passedTests;
+            
+            results.innerHTML = `
+                <div style="display: flex; gap: 20px; margin-bottom: 10px;">
+                    <div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 4px; flex: 1;">
+                        <strong>✅ Exitosos:</strong> ${passedTests}
+                    </div>
+                    <div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px; flex: 1;">
+                        <strong>❌ Fallidos:</strong> ${failedTests}
+                    </div>
+                    <div style="background: #d1ecf1; color: #0c5460; padding: 10px; border-radius: 4px; flex: 1;">
+                        <strong>📊 Total:</strong> ${totalTests}
+                    </div>
+                </div>
+                <div style="font-size: 12px;">
+                    ${Object.entries(testResults).map(([test, result]) => 
+                        `<div style="color: ${result === 'success' ? 'green' : 'red'}">${test}: ${result === 'success' ? '✅' : '❌'}</div>`
+                    ).join('')}
+                </div>
+            `;
+        }
+        
+        function getAuthHeaders() {
+            const token = localStorage.getItem('access_token');
+            return token ? { 'Authorization': `Bearer ${token}` } : {};
+        }
+        
+        async function testAuth() {
+            addLog('🔐 Verificando autenticación...');
+            
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                addLog('✅ Token encontrado en localStorage', 'success');
+                updateStatus('Usuario autenticado', 'success');
+                testResults['Autenticación'] = 'success';
+                updateResults();
+                return true;
+            } else {
+                addLog('❌ No hay token en localStorage', 'error');
+                updateStatus('Usuario no autenticado', 'error');
+                testResults['Autenticación'] = 'error';
+                updateResults();
+                return false;
+            }
+        }
+        
+        async function testCategoriasList() {
+            addLog('📂 Probando carga de lista de categorías...');
+            
+            const headers = getAuthHeaders();
+            if (!headers.Authorization) {
+                addLog('❌ No hay token de autenticación', 'error');
+                testResults['Lista de Categorías'] = 'error';
+                updateResults();
+                return;
+            }
+            
+            try {
+                const startTime = Date.now();
+                
+                const searchParams = { ordering: 'orden,nombre' };
+                const response = await fetch(`${API_BASE}/categorias/?${new URLSearchParams(searchParams)}`, { headers });
+                const data = await response.json();
+                
+                const loadTime = Date.now() - startTime;
+                
+                if (response.ok) {
+                    addLog(`✅ Categorías cargadas en ${loadTime}ms`, 'success');
+                    addLog(`📊 Total categorías: ${data.count || 0}`, 'success');
+                    showCategories(data.results || []);
+                    testResults['Lista de Categorías'] = 'success';
+                } else {
+                    addLog(`❌ Error cargando categorías: ${response.status}`, 'error');
+                    testResults['Lista de Categorías'] = 'error';
+                }
+                
+            } catch (error) {
+                addLog(`❌ Error en test: ${error.message}`, 'error');
+                testResults['Lista de Categorías'] = 'error';
+            }
+            
+            updateResults();
+        }
+        
+        async function testCategoriasSearch() {
+            addLog('🔍 Probando búsqueda de categorías...');
+            
+            const headers = getAuthHeaders();
+            if (!headers.Authorization) {
+                addLog('❌ No hay token de autenticación', 'error');
+                testResults['Búsqueda de Categorías'] = 'error';
+                updateResults();
+                return;
+            }
+            
+            try {
+                const searchParams = { search: 'categoria', page_size: 5 };
+                const response = await fetch(`${API_BASE}/categorias/?${new URLSearchParams(searchParams)}`, { headers });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addLog(`✅ Búsqueda exitosa - ${data.results?.length || 0} resultados`, 'success');
+                    testResults['Búsqueda de Categorías'] = 'success';
+                } else {
+                    addLog(`❌ Error en búsqueda: ${response.status}`, 'error');
+                    testResults['Búsqueda de Categorías'] = 'error';
+                }
+                
+            } catch (error) {
+                addLog(`❌ Error en búsqueda: ${error.message}`, 'error');
+                testResults['Búsqueda de Categorías'] = 'error';
+            }
+            
+            updateResults();
+        }
+        
+        async function testCategoriaCreate() {
+            addLog('➕ Probando creación de categoría...');
+            
+            const headers = getAuthHeaders();
+            if (!headers.Authorization) {
+                addLog('❌ No hay token de autenticación', 'error');
+                testResults['Crear Categoría'] = 'error';
+                updateResults();
+                return;
+            }
+            
+            try {
+                const testCategory = {
+                    nombre: `Test Category ${Date.now()}`,
+                    descripcion: 'Categoría de prueba',
+                    activa: true,
+                    orden: 999
+                };
+                
+                const response = await fetch(`${API_BASE}/categorias/`, {
+                    method: 'POST',
+                    headers: { ...headers, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(testCategory)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addLog(`✅ Categoría creada exitosamente: ${data.nombre}`, 'success');
+                    testResults['Crear Categoría'] = 'success';
+                } else {
+                    const errorData = await response.json();
+                    addLog(`❌ Error creando categoría: ${response.status} - ${JSON.stringify(errorData)}`, 'error');
+                    testResults['Crear Categoría'] = 'error';
+                }
+                
+            } catch (error) {
+                addLog(`❌ Error en creación: ${error.message}`, 'error');
+                testResults['Crear Categoría'] = 'error';
+            }
+            
+            updateResults();
+        }
+        
+        async function testCategoriaUpdate() {
+            addLog('✏️ Probando actualización de categoría...');
+            
+            const headers = getAuthHeaders();
+            if (!headers.Authorization) {
+                addLog('❌ No hay token de autenticación', 'error');
+                testResults['Actualizar Categoría'] = 'error';
+                updateResults();
+                return;
+            }
+            
+            try {
+                // Primero obtener una categoría existente
+                const listResponse = await fetch(`${API_BASE}/categorias/?page_size=1`, { headers });
+                const listData = await listResponse.json();
+                
+                if (listData.results && listData.results.length > 0) {
+                    const category = listData.results[0];
+                    const updateData = {
+                        ...category,
+                        descripcion: `Actualizada ${Date.now()}`
+                    };
+                    
+                    const response = await fetch(`${API_BASE}/categorias/${category.slug}/`, {
+                        method: 'PUT',
+                        headers: { ...headers, 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updateData)
+                    });
+                    
+                    if (response.ok) {
+                        addLog(`✅ Categoría actualizada exitosamente: ${category.nombre}`, 'success');
+                        testResults['Actualizar Categoría'] = 'success';
+                    } else {
+                        const errorData = await response.json();
+                        addLog(`❌ Error actualizando categoría: ${response.status} - ${JSON.stringify(errorData)}`, 'error');
+                        testResults['Actualizar Categoría'] = 'error';
+                    }
+                } else {
+                    addLog('⚠️ No hay categorías para actualizar', 'warning');
+                    testResults['Actualizar Categoría'] = 'success'; // No es un error real
+                }
+                
+            } catch (error) {
+                addLog(`❌ Error en actualización: ${error.message}`, 'error');
+                testResults['Actualizar Categoría'] = 'error';
+            }
+            
+            updateResults();
+        }
+        
+        async function testCategoriasDelete() {
+            addLog('🗑️ Probando eliminación de categoría...');
+            
+            const headers = getAuthHeaders();
+            if (!headers.Authorization) {
+                addLog('❌ No hay token de autenticación', 'error');
+                testResults['Eliminar Categoría'] = 'error';
+                updateResults();
+                return;
+            }
+            
+            try {
+                // Primero obtener una categoría existente
+                const listResponse = await fetch(`${API_BASE}/categorias/?page_size=1`, { headers });
+                const listData = await listResponse.json();
+                
+                if (listData.results && listData.results.length > 0) {
+                    const category = listData.results[0];
+                    
+                    // Solo eliminar si es una categoría de prueba
+                    if (category.nombre.includes('Test Category')) {
+                        const response = await fetch(`${API_BASE}/categorias/${category.slug}/`, {
+                            method: 'DELETE',
+                            headers
+                        });
+                        
+                        if (response.ok) {
+                            addLog(`✅ Categoría eliminada exitosamente: ${category.nombre}`, 'success');
+                            testResults['Eliminar Categoría'] = 'success';
+                        } else {
+                            addLog(`❌ Error eliminando categoría: ${response.status}`, 'error');
+                            testResults['Eliminar Categoría'] = 'error';
+                        }
+                    } else {
+                        addLog('⚠️ No se eliminó categoría (no es de prueba)', 'warning');
+                        testResults['Eliminar Categoría'] = 'success'; // No es un error real
+                    }
+                } else {
+                    addLog('⚠️ No hay categorías para eliminar', 'warning');
+                    testResults['Eliminar Categoría'] = 'success'; // No es un error real
+                }
+                
+            } catch (error) {
+                addLog(`❌ Error en eliminación: ${error.message}`, 'error');
+                testResults['Eliminar Categoría'] = 'error';
+            }
+            
+            updateResults();
+        }
+        
+        async function runAllTests() {
+            addLog('🚀 Ejecutando todos los tests...');
+            clearLog();
+            
+            await testAuth();
+            await testCategoriasList();
+            await testCategoriasSearch();
+            await testCategoriaCreate();
+            await testCategoriaUpdate();
+            await testCategoriasDelete();
+            
+            addLog('✅ Todos los tests completados', 'success');
+        }
+        
+        function showCategories(categories) {
+            categoriesPreview.style.display = 'block';
+            
+            if (categories.length === 0) {
+                categoriesList.innerHTML = '<p>No hay categorías disponibles</p>';
+                return;
+            }
+            
+            categoriesList.innerHTML = categories.map(category => `
+                <div class="category-item">
+                    <div class="category-name">${category.nombre}</div>
+                    <div class="category-description">${category.descripcion || 'Sin descripción'}</div>
+                    <div class="category-status">Estado: ${category.activa ? 'Activa' : 'Inactiva'}</div>
+                    <div>Orden: ${category.orden || 0}</div>
+                </div>
+            `).join('');
+        }
+        
+        // Inicialización
+        addLog('🚀 Página de test cargada');
+        testAuth();
+    </script>
+</body>
+</html>

@@ -1,10 +1,12 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def api_info(request):
     """
     Vista para mostrar información de la API en la ruta raíz
@@ -36,7 +38,9 @@ def api_info(request):
     }
     return Response(api_info, status=status.HTTP_200_OK)
 
+
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def health_check(request):
     """
     Endpoint para verificar el estado del servidor

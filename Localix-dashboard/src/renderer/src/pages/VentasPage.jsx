@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { 
   ShoppingCart, Package, X, Plus, Minus, Save, Trash2, User, 
   Search, CreditCard, Truck, MapPin, Clock, Check, AlertCircle,
-  Star, Eye, Filter, RefreshCw, ShoppingBag, Calculator, Percent
+  Star, Eye, Filter, RefreshCw, ShoppingBag, Calculator, Percent,
+  Printer
 } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { generarReciboVenta } from '../utils/ventaPDFGenerator';
 
 import ProductSearch from '../components/ventas/ProductSearch';
 import ProductList from '../components/ventas/ProductList';
@@ -15,6 +17,7 @@ import ClientSection from '../components/ventas/ClientSection';
 import ClientModal from '../components/ventas/ClientModal';
 import QuickClientModal from '../components/ventas/QuickClientModal';
 import SaleConfirmationModal from '../components/ventas/SaleConfirmationModal';
+import PrinterConfigModal from '../components/ventas/PrinterConfigModal';
 import { useOrderNotifications } from '../context/OrderNotificationsContext';
 
 const VentasPage = () => {
@@ -48,6 +51,7 @@ const VentasPage = () => {
   const [mostrarModalCrearCliente, setMostrarModalCrearCliente] = useState(false);
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const [modalVenta, setModalVenta] = useState({ open: false, venta: null });
+  const [mostrarConfigImpresora, setMostrarConfigImpresora] = useState(false);
   
   // Estados de nuevo cliente
   const [nuevoCliente, setNuevoCliente] = useState({
@@ -66,6 +70,35 @@ const VentasPage = () => {
   // Estados de búsqueda de clientes
   const [busquedaCliente, setBusquedaCliente] = useState('');
   const [resultadosBusquedaCliente, setResultadosBusquedaCliente] = useState([]);
+
+  // Listener para impresión automática de PDF
+  useEffect(() => {
+    const handleVentaCreada = async (event, data) => {
+      if (data.venta && data.autoPrint) {
+        try {
+          // Generar e imprimir el PDF automáticamente
+          await generarReciboVenta(data.venta, true);
+          toast.success('✅ Venta completada y recibo impreso automáticamente');
+        } catch (error) {
+          console.error('Error al generar PDF:', error);
+          toast.error('❌ Error al imprimir el recibo');
+        }
+      }
+    };
+
+    // Escuchar el evento de venta creada
+    if (window.electronAPI && window.electronAPI.ventas && typeof window.electronAPI.ventas.on === 'function') {
+      const unsubscribe = window.electronAPI.ventas.on('venta-creada', handleVentaCreada);
+      
+      return () => {
+        if (unsubscribe && typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      };
+    }
+    
+    return () => {};
+  }, []);
   const [mostrarResultadosCliente, setMostrarResultadosCliente] = useState(false);
 
   // Cargar datos iniciales
@@ -429,6 +462,15 @@ const VentasPage = () => {
           cliente_nombre: clienteSeleccionado?.nombre || clienteNombre || 'Cliente anónimo',
           items: response.data.items
         });
+        
+        // Generar e imprimir PDF automáticamente
+        try {
+          await generarReciboVenta(response.data, true);
+          toast.success('✅ Venta completada y recibo impreso automáticamente');
+        } catch (error) {
+          console.error('Error al generar PDF:', error);
+          toast.error('❌ Error al imprimir el recibo');
+        }
         
         cargarDatos();
         setModalVenta({ open: true, venta: response.data });
@@ -825,28 +867,39 @@ const VentasPage = () => {
 
           {/* Botón de finalizar venta */}
           <div className="p-6 border-t border-theme-border bg-theme-background">
-            <button
-              onClick={finalizarVenta}
-              disabled={loading || carrito.length === 0}
-              className="checkout-button w-full text-white py-3 px-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Procesando Venta...
-                </>
-              ) : (
-                <>
-                  <Check className="w-5 h-5" />
-                  Finalizar Venta
-                  {carrito.length > 0 && (
-                    <span className="ml-2 px-2 py-1 bg-theme-surface/20 rounded-full text-sm">
-                      ${calcularTotal().toLocaleString()}
-                    </span>
-                  )}
-                </>
-              )}
-            </button>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setMostrarConfigImpresora(true)}
+                className="px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
+                title="Configurar impresora"
+              >
+                <Printer className="w-4 h-4" />
+                Impresora
+              </button>
+              
+              <button
+                onClick={finalizarVenta}
+                disabled={loading || carrito.length === 0}
+                className="checkout-button flex-1 text-white py-3 px-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Procesando Venta...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-5 h-5" />
+                    Finalizar Venta
+                    {carrito.length > 0 && (
+                      <span className="ml-2 px-2 py-1 bg-theme-surface/20 rounded-full text-sm">
+                        ${calcularTotal().toLocaleString()}
+                      </span>
+                    )}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -890,6 +943,13 @@ const VentasPage = () => {
         <SaleConfirmationModal
           modalVenta={modalVenta}
           setModalVenta={setModalVenta}
+        />
+      )}
+
+      {mostrarConfigImpresora && (
+        <PrinterConfigModal
+          isOpen={mostrarConfigImpresora}
+          onClose={() => setMostrarConfigImpresora(false)}
         />
       )}
 

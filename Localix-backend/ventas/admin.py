@@ -22,6 +22,7 @@ class ClienteAdmin(admin.ModelAdmin):
         'activo',
         'tipo_documento',
         'fecha_registro',
+        'usuario',
     ]
     
     search_fields = [
@@ -50,11 +51,44 @@ class ClienteAdmin(admin.ModelAdmin):
         ('Estado', {
             'fields': ('activo',)
         }),
+        ('Propiedad', {
+            'fields': ('usuario',),
+            'classes': ('collapse',)
+        }),
         ('Información del Sistema', {
             'fields': ('fecha_registro', 'total_ventas', 'monto_total_compras'),
             'classes': ('collapse',)
         }),
     )
+    
+    def get_queryset(self, request):
+        """Filtra clientes por usuario (multi-tenancy)"""
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(usuario=request.user)
+    
+    def save_model(self, request, obj, form, change):
+        """Asigna automáticamente el usuario actual al crear un cliente"""
+        if not change:  # Si es una creación nueva
+            obj.usuario = request.user
+        super().save_model(request, obj, form, change)
+    
+    def has_change_permission(self, request, obj=None):
+        """Solo permite editar clientes propios (excepto superusuarios)"""
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return True
+        return obj.usuario == request.user
+    
+    def has_delete_permission(self, request, obj=None):
+        """Solo permite eliminar clientes propios (excepto superusuarios)"""
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return True
+        return obj.usuario == request.user
     
     def total_ventas(self, obj):
         """Muestra el total de ventas del cliente"""
@@ -92,7 +126,8 @@ class VentaAdmin(admin.ModelAdmin):
         'total',
         'estado',
         'metodo_pago',
-        'vendedor'
+        'vendedor',
+        'usuario'
     ]
     
     list_filter = [
@@ -100,6 +135,7 @@ class VentaAdmin(admin.ModelAdmin):
         'metodo_pago',
         'fecha_venta',
         'cliente',
+        'usuario',
     ]
     
     search_fields = [
@@ -152,20 +188,37 @@ class VentaAdmin(admin.ModelAdmin):
     get_cliente_display.short_description = 'Cliente'
     
     def get_queryset(self, request):
-        """Optimiza las consultas incluyendo el cliente"""
-        return super().get_queryset(request).select_related('cliente')
+        """Optimiza las consultas incluyendo el cliente y filtra por usuario"""
+        qs = super().get_queryset(request).select_related('cliente')
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(usuario=request.user)
+    
+    def save_model(self, request, obj, form, change):
+        """Asigna automáticamente el usuario actual al crear una venta"""
+        if not change:  # Si es una creación nueva
+            obj.usuario = request.user
+        super().save_model(request, obj, form, change)
     
     def has_add_permission(self, request):
         """Permite crear ventas desde el admin"""
         return True
     
     def has_change_permission(self, request, obj=None):
-        """Permite editar ventas desde el admin"""
-        return True
+        """Solo permite editar ventas propias (excepto superusuarios)"""
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return True
+        return obj.usuario == request.user
     
     def has_delete_permission(self, request, obj=None):
-        """Permite eliminar ventas desde el admin"""
-        return True
+        """Solo permite eliminar ventas propias (excepto superusuarios)"""
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return True
+        return obj.usuario == request.user
 
 @admin.register(ItemVenta)
 class ItemVentaAdmin(admin.ModelAdmin):

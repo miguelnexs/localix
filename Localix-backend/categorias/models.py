@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django.utils.text import slugify
 
@@ -8,14 +9,12 @@ class CategoriaBase(models.Model):
     """
     nombre = models.CharField(
         max_length=100,
-        unique=True,
         verbose_name=_("Nombre"),
-        help_text=_("Nombre único de la categoría")
+        help_text=_("Nombre de la categoría")
     )
     
     slug = models.SlugField(
         max_length=110,
-        unique=True,
         verbose_name=_("Slug"),
         help_text=_("Identificador único para URLs")
     )
@@ -66,6 +65,14 @@ class CategoriaProducto(CategoriaBase):
     """
     Modelo específico para categorías de productos
     """
+    # Campo para multi-tenancy
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        verbose_name=_("Usuario propietario"),
+        help_text=_("Usuario que posee esta categoría")
+    )
+    
     # Campos de fecha para auditoría
     fecha_creacion = models.DateTimeField(
         auto_now_add=True,
@@ -82,6 +89,10 @@ class CategoriaProducto(CategoriaBase):
     class Meta:
         verbose_name = _("Categoría de producto")
         verbose_name_plural = _("Categorías de productos")
+        indexes = [
+            models.Index(fields=['usuario', 'nombre']),
+            models.Index(fields=['usuario', 'slug']),
+        ]
 
     @property
     def cantidad_productos(self):

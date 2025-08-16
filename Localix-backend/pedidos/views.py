@@ -18,6 +18,12 @@ class PedidoViewSet(viewsets.ModelViewSet):
     search_fields = ['numero_pedido', 'cliente__nombre', 'cliente__email']
     ordering_fields = ['fecha_creacion', 'numero_pedido', 'total_pedido']
     ordering = ['-fecha_creacion']
+
+    def get_queryset(self):
+        """
+        Filtra los pedidos por usuario autenticado
+        """
+        return Pedido.objects.filter(usuario=self.request.user).select_related('cliente', 'venta')
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -28,7 +34,7 @@ class PedidoViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         try:
-            pedido = serializer.save()
+            pedido = serializer.save(usuario=self.request.user)
             # Crear historial inicial
             HistorialPedido.objects.create(
                 pedido=pedido,

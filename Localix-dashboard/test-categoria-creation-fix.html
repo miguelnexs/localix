@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Categoría Creation Fix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .loading {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Categoría Creation Fix</h1>
+        <p>Esta página prueba la creación de categorías después de implementar el sistema multi-tenancy.</p>
+        
+        <div class="form-group">
+            <label for="token">Token de Acceso:</label>
+            <input type="text" id="token" placeholder="Pega tu token de acceso aquí">
+        </div>
+        
+        <div class="form-group">
+            <label for="nombre">Nombre de la Categoría:</label>
+            <input type="text" id="nombre" placeholder="Ej: Electrónicos" value="Test Categoría">
+        </div>
+        
+        <div class="form-group">
+            <label for="descripcion">Descripción:</label>
+            <textarea id="descripcion" rows="3" placeholder="Descripción de la categoría">Categoría de prueba para verificar el fix</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="orden">Orden:</label>
+            <input type="number" id="orden" value="1" min="0">
+        </div>
+        
+        <div class="form-group">
+            <label for="activa">Activa:</label>
+            <select id="activa">
+                <option value="true">Sí</option>
+                <option value="false">No</option>
+            </select>
+        </div>
+        
+        <button onclick="testCreateCategory()">Crear Categoría</button>
+        <button onclick="testListCategories()">Listar Categorías</button>
+        <button onclick="clearResults()">Limpiar Resultados</button>
+        
+        <div id="result" class="result info">
+            Haz clic en "Crear Categoría" para probar la funcionalidad.
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = `result ${type}`;
+        }
+        
+        function clearResults() {
+            showResult('Resultados limpiados.', 'info');
+        }
+        
+        async function makeRequest(url, options = {}) {
+            const token = document.getElementById('token').value;
+            
+            const defaultOptions = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` })
+                }
+            };
+            
+            const finalOptions = {
+                ...defaultOptions,
+                ...options,
+                headers: {
+                    ...defaultOptions.headers,
+                    ...options.headers
+                }
+            };
+            
+            try {
+                const response = await fetch(url, finalOptions);
+                const data = await response.json();
+                
+                return {
+                    ok: response.ok,
+                    status: response.status,
+                    data: data
+                };
+            } catch (error) {
+                return {
+                    ok: false,
+                    status: 0,
+                    data: { error: error.message }
+                };
+            }
+        }
+        
+        async function testCreateCategory() {
+            showResult('🔄 Creando categoría...', 'loading');
+            
+            const nombre = document.getElementById('nombre').value;
+            const descripcion = document.getElementById('descripcion').value;
+            const orden = parseInt(document.getElementById('orden').value);
+            const activa = document.getElementById('activa').value === 'true';
+            
+            if (!nombre.trim()) {
+                showResult('❌ Error: El nombre de la categoría es requerido.', 'error');
+                return;
+            }
+            
+            const categoryData = {
+                nombre: nombre.trim(),
+                descripcion: descripcion.trim(),
+                orden: orden,
+                activa: activa
+            };
+            
+            console.log('📤 Enviando datos:', categoryData);
+            
+            const result = await makeRequest(`${API_BASE}/categorias/`, {
+                method: 'POST',
+                body: JSON.stringify(categoryData)
+            });
+            
+            console.log('📥 Respuesta recibida:', result);
+            
+            if (result.ok) {
+                const successMessage = `✅ Categoría creada exitosamente!
+
+📋 Detalles:
+   ID: ${result.data.id}
+   Nombre: ${result.data.nombre}
+   Slug: ${result.data.slug}
+   Descripción: ${result.data.descripcion}
+   Orden: ${result.data.orden}
+   Activa: ${result.data.activa}
+   Fecha de creación: ${result.data.fecha_creacion}
+
+🎉 ¡El fix de multi-tenancy funciona correctamente!`;
+                
+                showResult(successMessage, 'success');
+            } else {
+                let errorMessage = `❌ Error al crear categoría (Status: ${result.status})
+
+🔍 Detalles del error:`;
+                
+                if (result.data.error) {
+                    errorMessage += `\n   Error: ${result.data.error}`;
+                }
+                
+                if (result.data.nombre) {
+                    errorMessage += `\n   Nombre: ${result.data.nombre.join(', ')}`;
+                }
+                
+                if (result.data.descripcion) {
+                    errorMessage += `\n   Descripción: ${result.data.descripcion.join(', ')}`;
+                }
+                
+                if (result.data.orden) {
+                    errorMessage += `\n   Orden: ${result.data.orden.join(', ')}`;
+                }
+                
+                if (result.data.activa) {
+                    errorMessage += `\n   Activa: ${result.data.activa.join(', ')}`;
+                }
+                
+                if (result.status === 401) {
+                    errorMessage += `\n\n💡 Sugerencia: Verifica que el token de acceso sea válido.`;
+                }
+                
+                showResult(errorMessage, 'error');
+            }
+        }
+        
+        async function testListCategories() {
+            showResult('🔄 Obteniendo categorías...', 'loading');
+            
+            const result = await makeRequest(`${API_BASE}/categorias/`);
+            
+            if (result.ok) {
+                const categories = result.data.results || result.data;
+                const count = categories.length;
+                
+                let message = `✅ Categorías obtenidas exitosamente (${count} categorías)
+
+📋 Lista de categorías:`;
+                
+                if (count === 0) {
+                    message += `\n   No hay categorías disponibles.`;
+                } else {
+                    categories.forEach((cat, index) => {
+                        message += `\n   ${index + 1}. ${cat.nombre} (${cat.slug}) - ${cat.activa ? 'Activa' : 'Inactiva'}`;
+                    });
+                }
+                
+                showResult(message, 'success');
+            } else {
+                let errorMessage = `❌ Error al obtener categorías (Status: ${result.status})
+
+🔍 Detalles del error:`;
+                
+                if (result.data.error) {
+                    errorMessage += `\n   Error: ${result.data.error}`;
+                }
+                
+                if (result.data.detail) {
+                    errorMessage += `\n   Detail: ${result.data.detail}`;
+                }
+                
+                if (result.status === 401) {
+                    errorMessage += `\n\n💡 Sugerencia: Verifica que el token de acceso sea válido.`;
+                }
+                
+                showResult(errorMessage, 'error');
+            }
+        }
+        
+        // Auto-load token from localStorage if available
+        window.addEventListener('load', () => {
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                document.getElementById('token').value = token;
+                showResult('🔑 Token cargado automáticamente desde localStorage.', 'info');
+            }
+        });
+    </script>
+</body>
+</html>

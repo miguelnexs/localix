@@ -4,6 +4,47 @@ const FormData = require('form-data');
 const { Buffer } = require('buffer');
 const { handleApiError, API_BASE_URL } = require('./apiErrorHandler');
 
+// Función para obtener el token de autenticación desde el renderer
+async function getAuthToken() {
+  try {
+    // Obtener el token desde el renderer process
+    const { BrowserWindow } = require('electron');
+    const windows = BrowserWindow.getAllWindows();
+    
+    if (windows.length > 0) {
+      const mainWindow = windows[0];
+      const token = await mainWindow.webContents.executeJavaScript(`
+        localStorage.getItem('access_token')
+      `);
+      return token;
+    }
+    return null;
+  } catch (error) {
+    console.warn('No se pudo obtener el token de autenticación:', error.message);
+    return null;
+  }
+}
+
+// Función para crear configuración de axios con autenticación
+async function createAuthenticatedConfig() {
+  const token = await getAuthToken();
+  const config = {
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache'
+    },
+    maxContentLength: 50 * 1024 * 1024, // 50MB
+    maxBodyLength: 50 * 1024 * 1024,    // 50MB
+    timeout: 30000 // 30 segundos
+  };
+  
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  
+  return config;
+}
+
 const AXIOS_CONFIG = {
   headers: {
     'Accept': 'application/json',
@@ -20,10 +61,13 @@ module.exports = () => {
     try {
       console.log('🧹 Limpiando categorías "General" duplicadas...');
       
+      // Obtener configuración autenticada
+      const config = await createAuthenticatedConfig();
+      
       // Obtener todas las categorías "General"
       const response = await axios.get(`${API_BASE_URL}/api/categorias/`, {
         params: { search: 'General', ordering: 'id' },
-        ...AXIOS_CONFIG  
+        ...config
       });
       
       const categories = response.data.results || response.data || [];
@@ -46,7 +90,7 @@ module.exports = () => {
       
       for (const duplicate of duplicatesToDelete) {
         try {
-          await axios.delete(`${API_BASE_URL}/api/categorias/${duplicate.id}/`, AXIOS_CONFIG);
+          await axios.delete(`${API_BASE_URL}/api/categorias/${duplicate.id}/`, config);
           console.log(`✅ Eliminada categoría duplicada ID: ${duplicate.id}`);
         } catch (deleteError) {
           console.error(`❌ Error eliminando categoría ID ${duplicate.id}:`, deleteError.response?.data);
@@ -71,9 +115,10 @@ module.exports = () => {
       // Paso 1: Buscar si ya existe una categoría "General"
       let generalCategory = null;
       try {
+        const config = await createAuthenticatedConfig();
         const searchResponse = await axios.get(`${API_BASE_URL}/api/categorias/`, {
           params: { search: 'General' },
-          ...AXIOS_CONFIG
+          ...config
         });
         
         const categories = searchResponse.data.results || searchResponse.data || [];
@@ -101,9 +146,9 @@ module.exports = () => {
           formData.append('orden', '0');
           
           const createResponse = await axios.post(`${API_BASE_URL}/api/categorias/`, formData, {
-            ...AXIOS_CONFIG,
+            ...config,
             headers: {
-              ...AXIOS_CONFIG.headers,
+              ...config.headers,
               ...formData.getHeaders()
             }
           });
@@ -119,7 +164,7 @@ module.exports = () => {
           try {
             const retryResponse = await axios.get(`${API_BASE_URL}/api/categorias/`, {
               params: { search: 'General' },
-              ...AXIOS_CONFIG
+              ...config
             });
             
             const retryCategories = retryResponse.data.results || retryResponse.data || [];
@@ -149,9 +194,10 @@ module.exports = () => {
   // Listar categorías
   ipcMain.handle('categorias:listar', async () => {
     try {
+      const config = await createAuthenticatedConfig();
       const response = await axios.get(`${API_BASE_URL}/api/categorias/`, {
         params: { ordering: 'orden,nombre' },
-        ...AXIOS_CONFIG
+        ...config
       });
       return response.data.results || response.data;
     } catch (error) {
@@ -162,7 +208,8 @@ module.exports = () => {
   // Obtener una categoría
   ipcMain.handle('categorias:obtener', async (_, slug) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/categorias/${slug}/`, AXIOS_CONFIG);
+      const config = await createAuthenticatedConfig();
+      const response = await axios.get(`${API_BASE_URL}/api/categorias/${slug}/`, config);
       return response.data;
     } catch (error) {
       throw new Error(await handleApiError(error));
@@ -179,7 +226,7 @@ module.exports = () => {
         throw new Error('El nombre de la categoría es requerido');
       }
 
-      let config = { ...AXIOS_CONFIG };
+      const config = await createAuthenticatedConfig();
       const formData = new FormData();
 
       // Agregar campos básicos con validación
@@ -276,7 +323,7 @@ module.exports = () => {
   ipcMain.handle('categorias:actualizar', async (_, { slug, data }) => {
     try {
       console.log('Handler: Actualizando categoría:', slug);
-      let config = { ...AXIOS_CONFIG };
+      const config = await createAuthenticatedConfig();
       const formData = new FormData();
       formData.append('nombre', data.nombre || '');
       formData.append('descripcion', data.descripcion || '');
@@ -336,9 +383,11 @@ module.exports = () => {
   // Eliminar categoría (mejorado para manejar duplicados)
   ipcMain.handle('categorias:eliminar', async (_, slug) => {
     try {
+      const config = await createAuthenticatedConfig();
+      
       // Primero intentar eliminación normal por slug
       try {
-        await axios.delete(`${API_BASE_URL}/api/categorias/${slug}/`, AXIOS_CONFIG);
+        await axios.delete(`${API_BASE_URL}/api/categorias/${slug}/`, config);
         return { success: true, slug };
       } catch (deleteError) {
         // Si falla por múltiples objetos (duplicados), buscar por slug y eliminar por ID
@@ -348,7 +397,7 @@ module.exports = () => {
           // Buscar todas las categorías con ese slug
           const searchResponse = await axios.get(`${API_BASE_URL}/api/categorias/`, {
             params: { search: slug },
-            ...AXIOS_CONFIG
+            ...config
           });
           
           const categories = searchResponse.data.results || searchResponse.data || [];
@@ -359,7 +408,7 @@ module.exports = () => {
             const categoryToDelete = matchingCategories[0];
             console.log(`🗑️ Eliminando categoría por ID: ${categoryToDelete.id}`);
             
-            await axios.delete(`${API_BASE_URL}/api/categorias/${categoryToDelete.id}/`, AXIOS_CONFIG);
+            await axios.delete(`${API_BASE_URL}/api/categorias/${categoryToDelete.id}/`, config);
             return { success: true, slug, deletedId: categoryToDelete.id };
           }
         }

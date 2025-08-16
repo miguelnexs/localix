@@ -82,23 +82,26 @@ class CategoriaSerializer(serializers.ModelSerializer):
             return 0
     
     def validate_nombre(self, value):
-        """Valida que el nombre sea único y no esté vacío"""
-        print(f"Validando nombre: '{value}'")
-        
+        """Valida que el nombre sea único por usuario y no esté vacío"""
         if not value or not value.strip():
-            print("Error: nombre vacío o solo espacios")
             raise serializers.ValidationError("El nombre de la categoría es requerido.")
         
         value = value.strip()
-        print(f"Nombre después de strip: '{value}'")
         
-        # Si estamos actualizando, verificar que no haya conflicto con otros registros
+        # Obtener el usuario del contexto de la request
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            print("Error: usuario no autenticado")
+            raise serializers.ValidationError("Usuario no autenticado.")
+        
+        # Si estamos actualizando, verificar que no haya conflicto con otros registros del mismo usuario
         if self.instance and self.instance.nombre == value:
             print("Actualizando sin cambio de nombre")
             return value
             
-        if CategoriaProducto.objects.filter(nombre__iexact=value).exists():
-            print(f"Error: ya existe categoría con nombre '{value}'")
+        # Verificar unicidad solo dentro del usuario actual
+        if CategoriaProducto.objects.filter(usuario=request.user, nombre__iexact=value).exists():
+            print(f"Error: ya existe categoría con nombre '{value}' para el usuario {request.user.username}")
             raise serializers.ValidationError("Ya existe una categoría con este nombre.")
         
         print(f"Nombre válido: '{value}'")
@@ -160,26 +163,44 @@ class CategoriaSerializer(serializers.ModelSerializer):
         return data
     
     def create(self, validated_data):
-        """Crea la categoría generando automáticamente el slug"""
+        """Crea la categoría generando automáticamente el slug único por usuario"""
         try:
-            # Generar slug único
+            # Obtener el usuario del contexto
+            request = self.context.get('request')
+            if not request or not request.user.is_authenticated:
+                raise serializers.ValidationError("Usuario no autenticado.")
+            
+            # Generar slug único por usuario
             base_slug = slugify(validated_data['nombre'])
             slug = base_slug
             counter = 1
             
-            # Verificar que el slug sea único
-            while CategoriaProducto.objects.filter(slug=slug).exists():
+            # Verificar que el slug sea único solo para este usuario
+            while CategoriaProducto.objects.filter(usuario=request.user, slug=slug).exists():
                 slug = f"{base_slug}-{counter}"
                 counter += 1
             
             validated_data['slug'] = slug
+            validated_data['usuario'] = request.user  # Asignar usuario explícitamente
             return super().create(validated_data)
         except Exception as e:
-            print(f"Error en create del serializer: {str(e)}")
             raise serializers.ValidationError(f"Error al crear categoría: {str(e)}")
     
     def update(self, instance, validated_data):
-        """Actualiza la categoría regenerando el slug si cambia el nombre"""
+        """Actualiza la categoría regenerando el slug único por usuario si cambia el nombre"""
         if 'nombre' in validated_data and instance.nombre != validated_data['nombre']:
-            validated_data['slug'] = slugify(validated_data['nombre'])
+            # Obtener el usuario del contexto
+            request = self.context.get('request')
+            if request and request.user.is_authenticated:
+                # Generar slug único por usuario
+                base_slug = slugify(validated_data['nombre'])
+                slug = base_slug
+                counter = 1
+                
+                # Verificar que el slug sea único solo para este usuario (excluyendo la instancia actual)
+                while CategoriaProducto.objects.filter(usuario=request.user, slug=slug).exclude(id=instance.id).exists():
+                    slug = f"{base_slug}-{counter}"
+                    counter += 1
+                
+                validated_data['slug'] = slug
         return super().update(instance, validated_data)

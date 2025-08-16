@@ -33,14 +33,16 @@ class ClienteViewSet(viewsets.ModelViewSet):
     """
     queryset = Cliente.objects.all().order_by('-fecha_registro')  # type: ignore[attr-defined]
     serializer_class = ClienteSerializer
-    permission_classes = [AllowAny]
     
     def get_queryset(self):
         """
-        Permite filtrar por estado activo/inactivo
-        Por defecto muestra todos los clientes
+        Permite filtrar por estado activo/inactivo y multi-tenancy
+        Por defecto muestra todos los clientes del usuario
         """
-        queryset = Cliente.objects.all().order_by('-fecha_registro')  # type: ignore[attr-defined]
+        print(f"🔍 [CLIENTE VIEWSET] get_queryset - Usuario: {self.request.user}")
+        print(f"🔍 [CLIENTE VIEWSET] get_queryset - Autenticado: {self.request.user.is_authenticated}")
+        
+        queryset = Cliente.objects.filter(usuario=self.request.user).order_by('-fecha_registro')  # type: ignore[attr-defined]
         activo = self.request.query_params.get('activo', None)
         
         if activo is not None:
@@ -49,7 +51,31 @@ class ClienteViewSet(viewsets.ModelViewSet):
             elif str(activo).lower() == 'false':
                 queryset = queryset.filter(activo=False)
         
+        print(f"🔍 [CLIENTE VIEWSET] get_queryset - Clientes encontrados: {queryset.count()}")
         return queryset
+
+    def perform_create(self, serializer):
+        """
+        Crear cliente y asignar usuario
+        """
+        print(f"🔍 [CLIENTE VIEWSET] perform_create - Usuario: {self.request.user}")
+        print(f"🔍 [CLIENTE VIEWSET] perform_create - Autenticado: {self.request.user.is_authenticated}")
+        return serializer.save(usuario=self.request.user)
+    
+    def create(self, request, *args, **kwargs):
+        """
+        Crear cliente con debugging
+        """
+        print(f"🔍 [CLIENTE VIEWSET] create - Usuario: {request.user}")
+        print(f"🔍 [CLIENTE VIEWSET] create - Autenticado: {request.user.is_authenticated}")
+        print(f"🔍 [CLIENTE VIEWSET] create - Datos recibidos: {request.data}")
+        
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        cliente = self.perform_create(serializer)
+        
+        print(f"✅ [CLIENTE VIEWSET] create - Cliente creado exitosamente: {cliente.id}")
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     @action(detail=True, methods=['get'])
     def ventas(self, request, pk=None):
@@ -125,7 +151,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
         if not query:
             return Response({'error': 'Query parameter required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        clientes = self.queryset.filter(
+        clientes = self.get_queryset().filter(
             Q(nombre__icontains=query) |  # type: ignore[operator]
             Q(email__icontains=query) |  # type: ignore[operator]
             Q(telefono__icontains=query)  # type: ignore[operator]
@@ -147,18 +173,11 @@ class ClienteViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Crear cliente
-            cliente = Cliente.objects.create(  # type: ignore[attr-defined]
-                nombre=data['nombre'],
-                email=data.get('email', ''),
-                telefono=data.get('telefono', ''),
-                tipo_documento=data.get('tipo_documento', 'dni'),
-                numero_documento=data.get('numero_documento', ''),
-                direccion=data.get('direccion', ''),
-                activo=True
-            )
+            # Usar serializer para crear cliente y asignar usuario
+            serializer = self.get_serializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            cliente = self.perform_create(serializer)
             
-            serializer = self.get_serializer(cliente)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
             
         except Exception as e:
@@ -170,7 +189,18 @@ class VentaViewSet(viewsets.ModelViewSet):
     """
     queryset = Venta.objects.select_related('cliente').prefetch_related('items__producto').order_by('-fecha_venta')  # type: ignore[attr-defined]
     serializer_class = VentaSerializer
-    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        """
+        Filtra las ventas por usuario autenticado
+        """
+        return Venta.objects.filter(usuario=self.request.user).select_related('cliente').prefetch_related('items__producto').order_by('-fecha_venta')
+
+    def perform_create(self, serializer):
+        """
+        Crear venta y asignar usuario
+        """
+        serializer.save(usuario=self.request.user)
     
     @action(detail=False, methods=['post'])
     def crear_venta_rapida(self, request):
@@ -188,30 +218,28 @@ class VentaViewSet(viewsets.ModelViewSet):
                         return Response({'error': f'Cliente con id {data["cliente_id"]} no existe'}, status=status.HTTP_400_BAD_REQUEST)
                 elif data.get('crear_cliente') and data.get('cliente_data'):
                     cliente_data = data['cliente_data']
-                    cliente = Cliente.objects.create(  # type: ignore[attr-defined]
-                        nombre=cliente_data['nombre'],
-                        email=cliente_data.get('email', ''),
-                        telefono=cliente_data.get('telefono', ''),
-                        tipo_documento=cliente_data.get('tipo_documento', 'dni'),
-                        numero_documento=cliente_data.get('numero_documento', ''),
-                        direccion=cliente_data.get('direccion', ''),
-                        activo=True
-                    )
+                    # Usar serializer para crear cliente y asignar usuario
+                    cliente_serializer = ClienteSerializer(data=cliente_data)
+                    cliente_serializer.is_valid(raise_exception=True)
+                    cliente = cliente_serializer.save(usuario=request.user)
 
                 # Validar que haya cliente o nombre de cliente
                 if not cliente and not cliente_nombre:
                     return Response({'error': 'Debe especificar un cliente (cliente_id) o un nombre para venta anónima (cliente_nombre).'}, status=status.HTTP_400_BAD_REQUEST)
 
-                # Crear la venta (sin numero_venta, se generará automáticamente)
-                venta = Venta.objects.create(  # type: ignore[attr-defined]
-                    cliente=cliente,
-                    cliente_nombre=cliente_nombre,
-                    porcentaje_descuento=Decimal(str(data.get('porcentaje_descuento', 0))),
-                    metodo_pago=data.get('metodo_pago', 'efectivo'),
-                    observaciones=data.get('observaciones', ''),
-                    vendedor=data.get('vendedor', 'Sistema'),
-                    estado='completada'
-                )
+                # Crear la venta usando serializer para asignar usuario
+                venta_data = {
+                    'cliente': cliente.id if cliente else None,
+                    'cliente_nombre': cliente_nombre,
+                    'porcentaje_descuento': Decimal(str(data.get('porcentaje_descuento', 0))),
+                    'metodo_pago': data.get('metodo_pago', 'efectivo'),
+                    'observaciones': data.get('observaciones', ''),
+                    'vendedor': data.get('vendedor', 'Sistema'),
+                    'estado': 'completada'
+                }
+                venta_serializer = VentaSerializer(data=venta_data)
+                venta_serializer.is_valid(raise_exception=True)
+                venta = venta_serializer.save(usuario=request.user)
 
                 # Crear los items de la venta
                 items_data = data.get('items', [])
@@ -314,6 +342,7 @@ class VentaViewSet(viewsets.ModelViewSet):
                 
                 # Crear el pedido
                 pedido = Pedido.objects.create(
+                    usuario=request.user,  # Asignar el usuario autenticado
                     cliente=cliente,
                     venta=venta,
                     tipo_venta=tipo_venta,
@@ -349,7 +378,7 @@ class VentaViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def resumen(self, request):
         """Obtener resumen de ventas"""
-        ventas = self.queryset[:20]
+        ventas = self.get_queryset()[:20]
         serializer = self.get_serializer(ventas, many=True)
         
         total_ventas = ventas.count()

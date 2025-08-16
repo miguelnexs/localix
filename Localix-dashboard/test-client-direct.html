@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Client Creation Direct - Localix</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .success {
+            background-color: #28a745;
+        }
+        .success:hover {
+            background-color: #218838;
+        }
+        .error {
+            background-color: #dc3545;
+        }
+        .error:hover {
+            background-color: #c82333;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Client Creation Direct - Localix</h1>
+        <p>Esta herramienta prueba la creación de clientes directamente usando IPC.</p>
+        
+        <div id="status"></div>
+        
+        <div class="form-group">
+            <label for="nombre">Nombre:</label>
+            <input type="text" id="nombre" value="Cliente Test Direct" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" value="testdirect@example.com" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="telefono">Teléfono:</label>
+            <input type="tel" id="telefono" value="123456789">
+        </div>
+        
+        <button onclick="testDirectClientCreation()" class="success">🧪 Probar Creación Directa</button>
+        <button onclick="testGetClientsDirect()" class="success">📋 Obtener Clientes Directo</button>
+        <button onclick="clearLog()" class="error">🗑️ Limpiar Log</button>
+        
+        <div class="log" id="log"></div>
+    </div>
+
+    <script>
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        async function testDirectClientCreation() {
+            try {
+                log('🚀 Iniciando prueba de creación directa de cliente...');
+                
+                const clienteData = {
+                    nombre: document.getElementById('nombre').value,
+                    email: document.getElementById('email').value,
+                    telefono: document.getElementById('telefono').value
+                };
+                
+                log(`📝 Datos del cliente: ${JSON.stringify(clienteData)}`);
+                
+                // Verificar si estamos en Electron
+                if (window.require) {
+                    log('✅ Detectado require (Electron)');
+                    
+                    // Usar require para acceder directamente a ipcRenderer
+                    const { ipcRenderer } = window.require('electron');
+                    log('✅ ipcRenderer obtenido');
+                    
+                    log('🔍 Invocando clientes:crear directamente...');
+                    const response = await ipcRenderer.invoke('clientes:crear', clienteData);
+                    log(`📦 Respuesta directa: ${JSON.stringify(response)}`);
+                    
+                    if (response.success) {
+                        showStatus('✅ Cliente creado exitosamente', 'success');
+                        log('✅ Cliente creado exitosamente');
+                    } else {
+                        showStatus(`❌ Error: ${response.error}`, 'error');
+                        log(`❌ Error: ${response.error}`);
+                    }
+                } else {
+                    log('❌ No se detectó require (no estamos en Electron)');
+                    showStatus('❌ No se detectó require', 'error');
+                }
+            } catch (error) {
+                log(`❌ Error en la prueba: ${error.message}`);
+                showStatus(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testGetClientsDirect() {
+            try {
+                log('🚀 Iniciando prueba de obtención directa de clientes...');
+                
+                if (window.require) {
+                    log('✅ Detectado require (Electron)');
+                    
+                    const { ipcRenderer } = window.require('electron');
+                    log('✅ ipcRenderer obtenido');
+                    
+                    log('🔍 Invocando clientes:obtener-todos directamente...');
+                    const response = await ipcRenderer.invoke('clientes:obtener-todos');
+                    log(`📦 Respuesta directa: ${JSON.stringify(response)}`);
+                    
+                    if (response.success) {
+                        showStatus(`✅ Clientes obtenidos: ${response.data?.length || 0} clientes`, 'success');
+                        log(`✅ Clientes obtenidos: ${response.data?.length || 0} clientes`);
+                    } else {
+                        showStatus(`❌ Error: ${response.error}`, 'error');
+                        log(`❌ Error: ${response.error}`);
+                    }
+                } else {
+                    log('❌ No se detectó require (no estamos en Electron)');
+                    showStatus('❌ No se detectó require', 'error');
+                }
+            } catch (error) {
+                log(`❌ Error en la prueba: ${error.message}`);
+                showStatus(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Verificar APIs disponibles al cargar
+        window.addEventListener('load', () => {
+            log('🔍 Verificando APIs disponibles...');
+            if (window.require) {
+                log('✅ require disponible');
+                try {
+                    const { ipcRenderer } = window.require('electron');
+                    log('✅ ipcRenderer disponible');
+                } catch (error) {
+                    log('❌ Error obteniendo ipcRenderer: ' + error.message);
+                }
+            } else {
+                log('❌ require no disponible');
+            }
+            
+            if (window.clientesAPI) {
+                log('✅ clientesAPI disponible');
+            } else {
+                log('❌ clientesAPI no disponible');
+            }
+        });
+    </script>
+</body>
+</html>

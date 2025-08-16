@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Frontend Category Creation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Frontend Category Creation</h1>
+        <p>Esta página prueba la creación de categorías desde el frontend.</p>
+        
+        <div class="form-group">
+            <label for="token">Token de Acceso:</label>
+            <input type="text" id="token" placeholder="Pega tu token de acceso aquí">
+        </div>
+        
+        <div class="form-group">
+            <label for="nombre">Nombre de la Categoría:</label>
+            <input type="text" id="nombre" placeholder="Ej: Mi Categoría" value="Mi Categoría">
+        </div>
+        
+        <div class="form-group">
+            <label for="descripcion">Descripción:</label>
+            <textarea id="descripcion" rows="3" placeholder="Descripción de la categoría">Descripción de mi categoría</textarea>
+        </div>
+        
+        <button onclick="testCreateCategory()">Crear Categoría</button>
+        <button onclick="clearResults()">Limpiar</button>
+        
+        <div id="result" class="result info">
+            Haz clic en "Crear Categoría" para probar la funcionalidad.
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = `result ${type}`;
+        }
+        
+        function clearResults() {
+            showResult('Resultados limpiados.', 'info');
+        }
+        
+        async function testCreateCategory() {
+            showResult('🔄 Creando categoría...', 'info');
+            
+            const token = document.getElementById('token').value;
+            const nombre = document.getElementById('nombre').value;
+            const descripcion = document.getElementById('descripcion').value;
+            
+            if (!token) {
+                showResult('❌ Error: Token de acceso requerido.', 'error');
+                return;
+            }
+            
+            if (!nombre.trim()) {
+                showResult('❌ Error: Nombre de categoría requerido.', 'error');
+                return;
+            }
+            
+            const categoryData = {
+                nombre: nombre.trim(),
+                descripcion: descripcion.trim(),
+                activa: true,
+                orden: 1
+            };
+            
+            console.log('📤 Enviando datos:', categoryData);
+            
+            try {
+                const response = await fetch(`${API_BASE}/categorias/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(categoryData)
+                });
+                
+                const data = await response.json();
+                
+                console.log('📥 Respuesta:', { status: response.status, data });
+                
+                if (response.ok) {
+                    const successMessage = `✅ Categoría creada exitosamente!
+
+📋 Detalles:
+   ID: ${data.id}
+   Nombre: ${data.nombre}
+   Slug: ${data.slug}
+   Descripción: ${data.descripcion}
+   Activa: ${data.activa}
+   Fecha: ${data.fecha_creacion}
+
+🎉 ¡La creación de categorías funciona correctamente!`;
+                    
+                    showResult(successMessage, 'success');
+                } else {
+                    let errorMessage = `❌ Error al crear categoría (Status: ${response.status})
+
+🔍 Detalles del error:`;
+                    
+                    if (data.error) {
+                        errorMessage += `\n   Error: ${data.error}`;
+                    }
+                    
+                    if (data.nombre) {
+                        errorMessage += `\n   Nombre: ${data.nombre.join(', ')}`;
+                    }
+                    
+                    if (data.descripcion) {
+                        errorMessage += `\n   Descripción: ${data.descripcion.join(', ')}`;
+                    }
+                    
+                    if (response.status === 401) {
+                        errorMessage += `\n\n💡 Sugerencia: Verifica que el token de acceso sea válido.`;
+                    }
+                    
+                    showResult(errorMessage, 'error');
+                }
+            } catch (error) {
+                console.error('❌ Error de red:', error);
+                showResult(`❌ Error de conexión: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-load token from localStorage if available
+        window.addEventListener('load', () => {
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                document.getElementById('token').value = token;
+                showResult('🔑 Token cargado automáticamente desde localStorage.', 'info');
+            }
+        });
+    </script>
+</body>
+</html>

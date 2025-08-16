@@ -8,7 +8,7 @@
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
-    "start": "electron-vite preview",
+    "start": "npm run build && electron-vite preview",
     "dev": "npm run build:preload && electron-vite dev",
     "build": "npm run build:preload && electron-vite build",
     "build:preload": "node ensure-preload.js",
@@ -40,6 +40,7 @@
     "framer-motion": "^12.7.4",
     "graphql": "^16.11.0",
     "graphql-ws": "^6.0.5",
+    "html2canvas": "^1.4.1",
     "image-size": "^2.0.2",
     "jspdf": "^3.0.1",
     "lucide-react": "^0.488.0",

@@ -26,6 +26,7 @@ import {
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useOrderNotifications } from '../../context/OrderNotificationsContext';
 import { useSettings } from '../../context/SettingsContext';
+import { useAuth } from '../../context/AuthContext';
 import SettingsPanel from './SettingsPanel';
 import ThemeIndicator from './ThemeIndicator';
 import localixLogo from '../../img/localix-logo.png';
@@ -38,6 +39,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
   const navigate = useNavigate();
   const { newOrders, clearOrderNotifications, removeOrderNotification, getNotificationsSummary } = useOrderNotifications();
   const { settings } = useSettings();
+  const { user, logout } = useAuth();
 
   // Cerrar sidebar en móvil al navegar
   useEffect(() => {
@@ -178,7 +180,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
           </div>
           {(!collapsed || isMobile) && (
             <h1 className="text-lg font-extrabold tracking-tight text-white font-serif whitespace-nowrap">
-              LOCALIX
+              Carolina González
             </h1>
           )}
         </div>
@@ -252,6 +254,38 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
             </ul>
           </div>
         ))}
+
+        {/* Información del usuario y logout */}
+        {(!collapsed || isMobile) && (
+          <div className="mb-4 px-2">
+            <div className="bg-theme-sidebar-surface rounded-lg p-3 border border-theme-sidebar">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
+                  <span className="text-white text-sm font-semibold">
+                    {user?.nombre_completo?.charAt(0) || user?.username?.charAt(0) || 'U'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-theme-sidebar-primary truncate">
+                    {user?.nombre_completo || user?.username}
+                  </p>
+                  <p className="text-xs text-theme-sidebar-secondary capitalize">
+                    {user?.rol || 'Usuario'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                className="w-full flex items-center justify-center px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-md transition-colors"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Cerrar Sesión
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Indicador de tema */}
         {(!collapsed || isMobile) && (

@@ -86,6 +86,10 @@ const OptimizedUtils = {
   }
 };
 
+// 🚀 HANDLER PARA OBTENER TOKEN DE AUTENTICACIÓN
+// Nota: ipcRenderer.handle no existe, usamos ipcRenderer.invoke para enviar al main process
+// El main process manejará la obtención del token desde el renderer
+
 // 🚀 MANEJO DE ERRORES OPTIMIZADO
 const setupOptimizedErrorHandling = () => {
   const errorListeners = new Set();
@@ -388,6 +392,19 @@ const exposeOptimizedElectronAPI = () => {
       obtenerVentas: () => optimizedInvoke('ventas:obtener-ventas'),
       obtenerResumen: () => optimizedInvoke('ventas:obtener-resumen'),
       obtenerEstadisticas: () => optimizedInvoke('ventas:obtener-resumen'), // Alias para compatibilidad
+      
+      // 🚀 EVENTOS DE VENTAS
+      on: (eventName, callback) => {
+        if (typeof callback === 'function') {
+          ipcRenderer.on(eventName, callback);
+          return () => ipcRenderer.off(eventName, callback);
+        }
+      },
+      off: (eventName, callback) => {
+        if (typeof callback === 'function') {
+          ipcRenderer.off(eventName, callback);
+        }
+      }
     },
 
     // 🚀 PEDIDOS OPTIMIZADOS
@@ -513,6 +530,15 @@ contextBridge.exposeInMainWorld('pedidosAPI', {
   obtenerHistorial: (pedidoId) => optimizedInvoke('pedidos:obtener-historial', pedidoId),
   obtenerEstadisticas: () => optimizedInvoke('pedidos:obtener-estadisticas'),
   buscar: (query) => optimizedInvoke('pedidos:buscar', query),
+});
+
+// 🚀 APIs DE PDF OPTIMIZADAS
+contextBridge.exposeInMainWorld('pdfAPI', {
+  imprimir: (pdfBlob, fileName) => optimizedInvoke('pdf:print', pdfBlob, fileName),
+  guardar: (pdfBlob, fileName) => optimizedInvoke('pdf:save', pdfBlob, fileName),
+  imprimirRecibo: (ventaData) => optimizedInvoke('venta:imprimir-recibo', ventaData),
+  obtenerImpresoraPorDefecto: () => optimizedInvoke('printer:get-default'),
+  listarImpresoras: () => optimizedInvoke('printer:list'),
 });
 
 console.log('[PRELOAD OPTIMIZADO] Script cargado exitosamente');

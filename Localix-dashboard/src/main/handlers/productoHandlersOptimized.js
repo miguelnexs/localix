@@ -10,6 +10,51 @@ const { buildFormData } = require('./handlerUtils');
 const sharp = require('sharp');
 const crypto = require('crypto');
 
+// 🚀 FUNCIÓN PARA OBTENER TOKEN DE AUTENTICACIÓN DESDE EL RENDERER
+async function getAuthToken() {
+  try {
+    // Obtener el token desde el renderer process
+    const { BrowserWindow } = require('electron');
+    const windows = BrowserWindow.getAllWindows();
+    
+    if (windows.length > 0) {
+      const mainWindow = windows[0];
+      const token = await mainWindow.webContents.executeJavaScript(`
+        localStorage.getItem('access_token')
+      `);
+      return token;
+    }
+    return null;
+  } catch (error) {
+    console.warn('No se pudo obtener el token de autenticación:', error.message);
+    return null;
+  }
+}
+
+// 🚀 FUNCIÓN PARA CREAR CONFIGURACIÓN DE AXIOS CON AUTENTICACIÓN
+async function createAuthenticatedConfig() {
+  const token = await getAuthToken();
+  const config = {
+    headers: {
+      'Accept': 'application/json',
+      'Cache-Control': 'max-age=300'
+    },
+    maxContentLength: 50 * 1024 * 1024,
+    maxBodyLength: 50 * 1024 * 1024,
+    timeout: 45000,
+    keepAlive: true,
+    keepAliveMsecs: 1000,
+    maxSockets: 10,
+    maxFreeSockets: 5
+  };
+  
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  
+  return config;
+}
+
 // 🚀 CACHE OPTIMIZADO
 const apiCache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos (aumentado de 30 segundos)
@@ -231,12 +276,13 @@ const batchOperations = {
   // 🚀 CARGAR PRODUCTOS Y CATEGORÍAS EN PARALELO
   loadProductsAndCategories: async (params = {}) => {
     try {
+      const config = await createAuthenticatedConfig();
       const [productsResponse, categoriesResponse] = await Promise.allSettled([
         axios.get(`${API_BASE_URL}/api/productos/productos/`, {
           params: { ordering: '-fecha_creacion', ...params },
-          ...AXIOS_CONFIG
+          ...config
         }),
-        axios.get(`${API_BASE_URL}/api/categorias/categorias/`, AXIOS_CONFIG)
+        axios.get(`${API_BASE_URL}/api/categorias/categorias/`, config)
       ]);
 
       const products = productsResponse.status === 'fulfilled' ? productsResponse.value.data : [];
@@ -251,9 +297,10 @@ const batchOperations = {
   // 🚀 CARGAR PRODUCTO CON COLORES E IMÁGENES
   loadProductWithDetails: async (slug) => {
     try {
+      const config = await createAuthenticatedConfig();
       const [productResponse, colorsResponse] = await Promise.allSettled([
-        axios.get(`${API_BASE_URL}/api/productos/productos/${slug}/`, AXIOS_CONFIG),
-        axios.get(`${API_BASE_URL}/api/productos/productos/${slug}/colores/`, AXIOS_CONFIG)
+        axios.get(`${API_BASE_URL}/api/productos/productos/${slug}/`, config),
+        axios.get(`${API_BASE_URL}/api/productos/productos/${slug}/colores/`, config)
       ]);
 
       const product = productResponse.status === 'fulfilled' ? productResponse.value.data : null;
@@ -280,12 +327,14 @@ module.exports = function setupProductHandlersOptimized() {
         return cachedData;
       }
       
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      const config = await createAuthenticatedConfig();
       const response = await axios.get(`${API_BASE_URL}/api/productos/productos/`, {
         params: {
           ordering: '-fecha_creacion',
           ...params
         },
-        ...AXIOS_CONFIG
+        ...config
       });
       
       setCache(cacheKey, response.data, BATCH_CACHE_DURATION);
@@ -341,9 +390,11 @@ module.exports = function setupProductHandlersOptimized() {
         return cachedData;
       }
       
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      const config = await createAuthenticatedConfig();
       const response = await axios.get(
         `${API_BASE_URL}/api/productos/productos/${slug}/`, 
-        AXIOS_CONFIG
+        config
       );
       
       setCache(cacheKey, response.data, CACHE_DURATION);
@@ -363,11 +414,13 @@ module.exports = function setupProductHandlersOptimized() {
         return cachedData;
       }
       
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      const baseConfig = await createAuthenticatedConfig();
       const colorsConfig = {
-        ...AXIOS_CONFIG,
+        ...baseConfig,
         timeout: 20000, // ampliar para endpoints de colores
         headers: {
-          ...AXIOS_CONFIG.headers,
+          ...baseConfig.headers,
           'Cache-Control': 'max-age=30'
         }
       };
@@ -410,11 +463,13 @@ module.exports = function setupProductHandlersOptimized() {
         knownLength: tempFile.size
       });
 
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      const baseConfig = await createAuthenticatedConfig();
       const config = {
-        ...AXIOS_CONFIG,
+        ...baseConfig,
         headers: {
           ...formData.getHeaders(),
-          ...AXIOS_CONFIG.headers
+          ...baseConfig.headers
         },
         onUploadProgress: (progressEvent) => {
           if (event) {
@@ -466,7 +521,8 @@ module.exports = function setupProductHandlersOptimized() {
       if (!productData?.precio || productData.precio <= 0) throw new Error('Precio debe ser mayor a 0');
       if (!productData?.costo || productData.costo < 0) throw new Error('Costo debe ser mayor o igual a 0');
       
-      let config = { ...AXIOS_CONFIG };
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      let config = await createAuthenticatedConfig();
       const formData = new FormData();
 
       // 🚀 AGREGAR CAMPOS BÁSICOS
@@ -539,7 +595,8 @@ module.exports = function setupProductHandlersOptimized() {
     try {
       if (!slug) throw new Error('Slug del producto es requerido');
       
-      let config = { ...AXIOS_CONFIG };
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      let config = await createAuthenticatedConfig();
       const formData = new FormData();
 
       // 🚀 AGREGAR CAMPOS BÁSICOS
@@ -590,9 +647,11 @@ module.exports = function setupProductHandlersOptimized() {
     try {
       if (!slug) throw new Error('Slug del producto es requerido');
       
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      const config = await createAuthenticatedConfig();
       await axios.delete(
         `${API_BASE_URL}/api/productos/productos/${slug}/`, 
-        AXIOS_CONFIG
+        config
       );
       
       // 🚀 LIMPIAR CACHE RELACIONADO
@@ -626,6 +685,276 @@ module.exports = function setupProductHandlersOptimized() {
       };
     } catch (error) {
       return { success: false, error: error.message };
+    }
+  });
+
+  // 🚀 COLORES OPTIMIZADOS
+  // 🚀 CREAR COLOR OPTIMIZADO
+  ipcMain.handle('productos:crearColor', async (event, productId, colorData) => {
+    try {
+      // 🚀 LIMPIAR CACHE RELACIONADO
+      const cacheKey = getCacheKey(`productos/${productId}/colores`);
+      smartCache.cache.delete(cacheKey);
+      
+      console.log('🚀 === CREANDO COLOR OPTIMIZADO ===');
+      console.log('🚀 Product ID:', productId);
+      console.log('🚀 Color data:', colorData);
+      
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      const config = await createAuthenticatedConfig();
+      
+      // Preparar datos del color
+      const colorFormData = {
+        producto: productId,
+        nombre: colorData.nombre,
+        hex_code: colorData.hex_code,
+        stock: colorData.stock || 0,
+        orden: colorData.orden || 1,
+        activo: colorData.activo !== undefined ? colorData.activo : true,
+        es_principal: colorData.es_principal || false
+      };
+      
+      console.log('🚀 Datos del color preparados:', colorFormData);
+      
+      const response = await axios.post(
+        `${API_BASE_URL}/api/productos/productos/${productId}/colores/`, 
+        querystring.stringify(colorFormData),
+        {
+          ...config,
+          headers: {
+            ...config.headers,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      console.log('🚀 Color creado exitosamente:', response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('🚀 Error creando color:', error);
+      return handleApiError(error, 'Error al crear color');
+    }
+  });
+
+  // 🚀 ACTUALIZAR COLOR OPTIMIZADO
+  ipcMain.handle('productos:actualizarColor', async (event, productId, colorId, colorData) => {
+    try {
+      // 🚀 LIMPIAR CACHE RELACIONADO
+      const cacheKey = getCacheKey(`productos/${productId}/colores`);
+      smartCache.cache.delete(cacheKey);
+      
+      console.log('🚀 === ACTUALIZANDO COLOR OPTIMIZADO ===');
+      console.log('🚀 Product ID:', productId);
+      console.log('🚀 Color ID:', colorId);
+      console.log('🚀 Color data:', colorData);
+      
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      const config = await createAuthenticatedConfig();
+      
+      // Preparar datos del color
+      const colorFormData = {
+        nombre: colorData.nombre,
+        hex_code: colorData.hex_code,
+        stock: colorData.stock || 0,
+        orden: colorData.orden || 1,
+        activo: colorData.activo !== undefined ? colorData.activo : true,
+        es_principal: colorData.es_principal || false
+      };
+      
+      console.log('🚀 Datos del color preparados para actualizar:', colorFormData);
+      
+      const response = await axios.put(
+        `${API_BASE_URL}/api/productos/productos/${productId}/colores/${colorId}/`, 
+        querystring.stringify(colorFormData),
+        {
+          ...config,
+          headers: {
+            ...config.headers,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      
+      console.log('🚀 Color actualizado exitosamente:', response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('🚀 Error actualizando color:', error);
+      return handleApiError(error, 'Error al actualizar color');
+    }
+  });
+
+  // 🚀 ELIMINAR COLOR OPTIMIZADO
+  ipcMain.handle('productos:eliminarColor', async (event, productId, colorId) => {
+    try {
+      // 🚀 LIMPIAR CACHE RELACIONADO
+      const cacheKey = getCacheKey(`productos/${productId}/colores`);
+      smartCache.cache.delete(cacheKey);
+      
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      const config = await createAuthenticatedConfig();
+      
+      await axios.delete(`${API_BASE_URL}/api/productos/productos/${productId}/colores/${colorId}/`, config);
+      return { success: true };
+    } catch (error) {
+      return handleApiError(error, 'Error al eliminar color');
+    }
+  });
+
+  // 🚀 IMÁGENES DE COLORES OPTIMIZADAS
+  // 🚀 OBTENER IMÁGENES OPTIMIZADO
+  ipcMain.handle('productos:obtenerImagenes', async (event, colorId) => {
+    try {
+      console.log('🚀 === OBTENIENDO IMÁGENES OPTIMIZADO ===');
+      console.log('🚀 Color ID:', colorId);
+      
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      const config = await createAuthenticatedConfig();
+      
+      const response = await axios.get(`${API_BASE_URL}/api/productos/colores/${colorId}/imagenes/`, config);
+      console.log('🚀 Respuesta del backend:', response.data);
+      
+      // 🚀 MANEJAR RESPUESTA PAGINADA DEL BACKEND
+      let imagenesData = [];
+      if (response.data && response.data.results) {
+        imagenesData = response.data.results;
+        console.log('🚀 Imágenes obtenidas (paginadas):', imagenesData.length);
+      } else if (Array.isArray(response.data)) {
+        imagenesData = response.data;
+        console.log('🚀 Imágenes obtenidas (array directo):', imagenesData.length);
+      } else {
+        console.log('🚀 Formato de respuesta inesperado:', typeof response.data);
+        imagenesData = [];
+      }
+      
+      return { success: true, data: imagenesData };
+    } catch (error) {
+      console.error('🚀 Error obteniendo imágenes:', error);
+      return handleApiError(error, 'Error al obtener imágenes del color');
+    }
+  });
+
+  // 🚀 SUBIR IMAGEN OPTIMIZADO
+  ipcMain.handle('productos:subirImagen', async (event, colorId, formData) => {
+    try {
+      console.log('🚀 === SUBIENDO IMAGEN OPTIMIZADO ===');
+      console.log('🚀 Color ID:', colorId);
+      console.log('🚀 FormData recibido:', formData);
+      
+      // Verificar que se recibió la imagen
+      if (!formData || !formData.imagen) {
+        console.error('🚀 No se recibió formData o formData.imagen');
+        throw new Error('Image is required');
+      }
+      
+      // Verificar que la imagen tiene datos
+      if (!formData.imagen.data || !Array.isArray(formData.imagen.data)) {
+        console.error('🚀 No se recibieron datos de imagen válidos');
+        throw new Error('Image data is required');
+      }
+      
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      const config = await createAuthenticatedConfig();
+      
+      // Preparar FormData para la subida
+      const uploadFormData = new FormData();
+      
+      // Agregar archivo de imagen
+      const imageFile = formData.imagen;
+      console.log('🚀 Archivo de imagen:', {
+        name: imageFile.name,
+        type: imageFile.type,
+        size: imageFile.size,
+        dataLength: imageFile.data.length
+      });
+      
+      // Convertir el archivo a Buffer
+      let imageBuffer;
+      if (imageFile.data && Array.isArray(imageFile.data)) {
+        imageBuffer = Buffer.from(imageFile.data);
+      } else if (imageFile.data instanceof Buffer) {
+        imageBuffer = imageFile.data;
+      } else {
+        throw new Error('Formato de datos de imagen no soportado');
+      }
+      
+      // Agregar archivo al FormData
+      uploadFormData.append('imagen', imageBuffer, {
+        filename: imageFile.name,
+        contentType: imageFile.type
+      });
+      
+      // Agregar campos adicionales si existen
+      if (formData.orden !== undefined) {
+        uploadFormData.append('orden', formData.orden.toString());
+      }
+      if (formData.es_principal !== undefined) {
+        uploadFormData.append('es_principal', formData.es_principal.toString());
+      }
+      
+      const response = await axios.post(
+        `${API_BASE_URL}/api/productos/colores/${colorId}/imagenes/`,
+        uploadFormData,
+        {
+          ...config,
+          headers: {
+            ...uploadFormData.getHeaders(),
+            ...config.headers
+          }
+        }
+      );
+      
+      console.log('🚀 Imagen subida exitosamente:', response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('🚀 Error subiendo imagen:', error);
+      return handleApiError(error, 'Error al subir imagen');
+    }
+  });
+
+  // 🚀 ELIMINAR IMAGEN OPTIMIZADO
+  ipcMain.handle('productos:eliminarImagen', async (event, colorId, imagenId) => {
+    try {
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      const config = await createAuthenticatedConfig();
+      
+      await axios.delete(`${API_BASE_URL}/api/productos/colores/${colorId}/imagenes/${imagenId}/`, config);
+      return { success: true };
+    } catch (error) {
+      return handleApiError(error, 'Error al eliminar imagen');
+    }
+  });
+
+  // 🚀 ESTABLECER IMAGEN PRINCIPAL OPTIMIZADO
+  ipcMain.handle('productos:establecerImagenPrincipal', async (event, colorId, imagenId) => {
+    try {
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      const config = await createAuthenticatedConfig();
+      
+      const response = await axios.post(
+        `${API_BASE_URL}/api/productos/colores/${colorId}/imagenes/${imagenId}/establecer_principal/`,
+        {},
+        config
+      );
+      return { success: true, data: response.data };
+    } catch (error) {
+      return handleApiError(error, 'Error al establecer imagen principal');
+    }
+  });
+
+  // 🚀 REORDENAR IMÁGENES OPTIMIZADO
+  ipcMain.handle('productos:reordenarImagenes', async (event, colorId, ordenData) => {
+    try {
+      // 🚀 OBTENER CONFIGURACIÓN AUTENTICADA
+      const config = await createAuthenticatedConfig();
+      
+      const response = await axios.post(
+        `${API_BASE_URL}/api/productos/colores/${colorId}/imagenes/reordenar/`,
+        ordenData,
+        config
+      );
+      return { success: true, data: response.data };
+    } catch (error) {
+      return handleApiError(error, 'Error al reordenar imágenes');
     }
   });
 };

@@ -15,6 +15,12 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // No establecer Content-Type para FormData, dejar que el navegador lo maneje
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+    
     return config;
   },
   (error) => {
@@ -26,11 +32,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response.status === 401) {
-      // Redirigir a login si no está autenticado
-      localStorage.removeItem('access_token');
-      window.location.href = '/login';
-    }
+    // No redirigir automáticamente, dejar que AuthContext maneje los errores 401
     return Promise.reject(error);
   }
 );

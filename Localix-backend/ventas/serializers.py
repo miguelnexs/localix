@@ -7,8 +7,9 @@ class ClienteSerializer(serializers.ModelSerializer):
         model = Cliente
         fields = [
             'id', 'nombre', 'email', 'telefono', 'tipo_documento',
-            'numero_documento', 'direccion', 'fecha_registro', 'activo'
+            'numero_documento', 'direccion', 'fecha_registro', 'activo', 'usuario'
         ]
+        read_only_fields = ['usuario']
 
 class ProductoVentaSerializer(serializers.ModelSerializer):
     categoria = serializers.StringRelatedField(read_only=True)
@@ -61,14 +62,15 @@ class VentaSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'numero_venta', 'fecha_venta', 'cliente', 'cliente_nombre',
             'subtotal', 'porcentaje_descuento', 'descuento', 'total', 'estado', 'metodo_pago',
-            'observaciones', 'vendedor', 'items'
+            'observaciones', 'vendedor', 'items', 'usuario'
         ]
+        read_only_fields = ['usuario']
 
 class VentaCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Venta
         fields = [
             'cliente', 'cliente_nombre', 'estado', 'metodo_pago',
-            'observaciones', 'vendedor', 'porcentaje_descuento'
+            'observaciones', 'vendedor', 'porcentaje_descuento', 'usuario'
         ]
-        read_only_fields = ['numero_venta', 'fecha_venta', 'subtotal', 'descuento', 'igv', 'total'] 
+        read_only_fields = ['numero_venta', 'fecha_venta', 'subtotal', 'descuento', 'igv', 'total', 'usuario'] 

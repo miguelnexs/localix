@@ -7,7 +7,7 @@ from .views import api_info, health_check
 
 urlpatterns = [
     # Ruta principal - Información de la API
-    path('/', api_info, name='api-info'),
+    path('', api_info, name='api-info'),
     
     # Health check
     path('health/', health_check, name='health-check'),
@@ -24,6 +24,7 @@ urlpatterns = [
     path('api/productos/', include('productos.urls')),
     path('api/ventas/', include('ventas.urls')),
     path('api/pedidos/', include('pedidos.urls')),
+    path('api/usuarios/', include('usuarios.urls')),
     
 ]
 

@@ -27,6 +27,9 @@ try {
   const { setupExportHandlers } = require('./handlers/exportHandlers');
   console.log('[MAIN] ✅ Handler de exportaciones importado');
   
+  const setupPdfHandlers = require('./handlers/pdfHandlers');
+  console.log('[MAIN] ✅ Handler de PDF importado');
+  
   console.log('[MAIN] ✅ Todos los handlers importados correctamente');
   
   // Configuración para reducir logs
@@ -230,6 +233,9 @@ try {
     
     console.log('[MAIN] 📊 Configurando handlers de exportaciones...');
     setupExportHandlers();
+    
+    console.log('[MAIN] 📄 Configurando handlers de PDF...');
+    setupPdfHandlers();
     
     console.log('[MAIN] ✅ Todos los handlers configurados correctamente');
     
