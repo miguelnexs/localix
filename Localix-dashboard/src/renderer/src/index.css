@@ -514,12 +514,76 @@
 .border-theme-secondary { border-color: var(--color-secondary); }
 .border-theme-border { border-color: var(--color-border); }
 
-/* Clases específicas para sidebar en tema claro */
+/* Clases específicas para sidebar mejorado */
 .bg-theme-sidebar { background-color: var(--color-sidebar-background, var(--color-surface)); }
 .bg-theme-sidebar-surface { background-color: var(--color-sidebar-surface, var(--color-secondary)); }
+.bg-theme-sidebar-hover { background-color: var(--color-sidebar-hover, var(--color-secondary)); }
+.bg-theme-sidebar-active { background-color: var(--color-sidebar-active, var(--color-accent)); }
 .text-theme-sidebar { color: var(--color-sidebar-text, var(--color-text)); }
 .text-theme-sidebar-secondary { color: var(--color-sidebar-textSecondary, var(--color-textSecondary)); }
 .border-theme-sidebar { border-color: var(--color-sidebar-border, var(--color-border)); }
+
+/* Efectos de glassmorphism para sidebar */
+.sidebar-glass {
+  background: rgba(var(--color-sidebar-rgb, 30, 41, 59), 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Efectos hover mejorados para sidebar */
+.sidebar-item-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-item-hover:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Efectos para elementos activos del sidebar */
+.sidebar-item-active {
+  background: linear-gradient(135deg, var(--color-sidebar-active) 0%, var(--color-accent) 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  transform: translateX(4px);
+}
+
+/* Mejoras específicas para el tema claro */
+[data-theme="light"] .sidebar-glass {
+  background: rgba(30, 41, 59, 0.98);
+  backdrop-filter: blur(25px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .sidebar-item-hover:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateX(6px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="light"] .sidebar-item-active {
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  transform: translateX(6px);
+}
+
+/* Animaciones suaves para el sidebar */
+.sidebar-nav-item {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-nav-item:hover {
+  transform: translateX(4px);
+}
+
+/* Efectos de profundidad para el sidebar */
+.sidebar-depth {
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
 
 /* Transiciones suaves para cambios de tema */
 * {
@@ -672,18 +736,21 @@
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-error: #ef4444;
-  /* Variables específicas para sidebar oscuro en tema claro */
-  --color-sidebar-background: #1f2937;
-  --color-sidebar-surface: #374151;
-  --color-sidebar-border: #4b5563;
+  /* Variables específicas para sidebar mejorado en tema claro */
+  --color-sidebar-background: #1e293b; /* Slate-800 más elegante */
+  --color-sidebar-surface: #334155; /* Slate-600 */
+  --color-sidebar-border: #475569; /* Slate-500 */
   --color-sidebar-text: #ffffff;
-  --color-sidebar-textSecondary: #9ca3af;
+  --color-sidebar-textSecondary: #94a3b8; /* Slate-400 más suave */
+  --color-sidebar-hover: #475569; /* Slate-500 para hover */
+  --color-sidebar-active: #3b82f6; /* Blue-500 para elementos activos */
   
   /* Variables RGB para efectos de transparencia */
   --color-surface-rgb: 255, 255, 255;
   --color-border-rgb: 229, 231, 235;
   --color-accent-rgb: 59, 130, 246; /* RGB para azul */
   --color-success-rgb: 16, 185, 129;
+  --color-sidebar-rgb: 30, 41, 59; /* RGB para sidebar */
 }
 
 /* Estilos específicos para el tema claro */

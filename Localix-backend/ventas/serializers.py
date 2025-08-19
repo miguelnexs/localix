@@ -41,6 +41,7 @@ class ColorProductoSerializer(serializers.ModelSerializer):
 
 class ItemVentaSerializer(serializers.ModelSerializer):
     producto = serializers.StringRelatedField(read_only=True)
+    producto_detalle = serializers.SerializerMethodField()
     variante = serializers.StringRelatedField(read_only=True)
     color = ColorProductoSerializer(read_only=True)
     precio_unitario = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
@@ -48,9 +49,21 @@ class ItemVentaSerializer(serializers.ModelSerializer):
     class Meta:
         model = ItemVenta
         fields = [
-            'id', 'producto', 'variante', 'color', 'cantidad',
+            'id', 'producto', 'producto_detalle', 'variante', 'color', 'cantidad',
             'precio_unitario', 'descuento_item', 'subtotal'
         ]
+
+    def get_producto_detalle(self, obj):
+        """Incluye información detallada del producto para cálculo de ganancias"""
+        if obj.producto:
+            return {
+                'id': obj.producto.id,
+                'nombre': obj.producto.nombre,
+                'precio': str(obj.producto.precio),
+                'costo': str(obj.producto.costo),
+                'margen_ganancia': str(obj.producto.margen_ganancia)
+            }
+        return None
 
 class VentaSerializer(serializers.ModelSerializer):
     cliente = ClienteSerializer(read_only=True)

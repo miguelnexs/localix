@@ -29,17 +29,22 @@ import { useSettings } from '../../context/SettingsContext';
 import { useAuth } from '../../context/AuthContext';
 import SettingsPanel from './SettingsPanel';
 import ThemeIndicator from './ThemeIndicator';
+import UserProfileModal from './UserProfileModal';
 import localixLogo from '../../img/localix-logo.png';
 
 const Sidebar = ({ collapsed = false, onToggle }) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [userProfileModalOpen, setUserProfileModalOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { newOrders, clearOrderNotifications, removeOrderNotification, getNotificationsSummary } = useOrderNotifications();
   const { settings } = useSettings();
   const { user, logout } = useAuth();
+
+  // Obtener configuración de marca personalizada
+  const customBrand = settings?.customBrand || {};
 
   // Cerrar sidebar en móvil al navegar
   useEffect(() => {
@@ -168,20 +173,31 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
   // Renderizar contenido de navegación
   const renderNavContent = () => (
     <div className="h-full flex flex-col">
-      {/* Encabezado */}
-      <div className="flex items-center justify-between p-3 border-b border-theme-sidebar bg-theme-primary">
-        <div className={`flex items-center gap-2 transition-all duration-300 ${collapsed && !isMobile ? 'justify-center' : ''}`}>
-          <div className="w-8 h-8 flex items-center justify-center shadow-lg">
-            <img 
-              src={localixLogo} 
-              alt="Localix Logo" 
-              className="w-8 h-8 object-cover rounded-full"
-            />
+      {/* Encabezado mejorado */}
+      <div className="flex items-center justify-between p-4 border-b border-theme-sidebar bg-gradient-to-r from-theme-primary to-theme-accent sidebar-glass">
+        <div className={`flex items-center gap-3 transition-all duration-300 ${collapsed && !isMobile ? 'justify-center' : ''}`}>
+          <div className="w-10 h-10 flex items-center justify-center shadow-xl rounded-xl bg-white/10 backdrop-blur-sm border border-white/20">
+            {customBrand.logo && customBrand.showLogo ? (
+              <img 
+                src={customBrand.logo} 
+                alt="Logo de la empresa" 
+                className="w-8 h-8 object-cover rounded-lg"
+              />
+            ) : (
+              <img 
+                src={localixLogo} 
+                alt="Localix Logo" 
+                className="w-8 h-8 object-cover rounded-lg"
+              />
+            )}
           </div>
-          {(!collapsed || isMobile) && (
-            <h1 className="text-lg font-extrabold tracking-tight text-white font-serif whitespace-nowrap">
-              Carolina González
-            </h1>
+          {(!collapsed || isMobile) && customBrand.showCompanyName && (
+            <div className="flex flex-col">
+              <h1 className="text-lg font-bold tracking-tight text-white font-serif whitespace-nowrap">
+                {customBrand.companyName || 'Carolina González'}
+              </h1>
+              <p className="text-xs text-white/80 font-medium">Administradora</p>
+            </div>
           )}
         </div>
         
@@ -189,10 +205,10 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
         {!isMobile && onToggle && (
           <button 
             onClick={onToggle}
-            className="p-1 rounded-lg hover:bg-theme-sidebar-surface transition-colors text-white"
+            className="p-2 rounded-lg hover:bg-white/10 transition-all duration-200 text-white hover:scale-105"
             aria-label={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
           >
-            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
         )}
         
@@ -200,15 +216,15 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
         {isMobile && (
           <button 
             onClick={closeMobileSidebar}
-            className="p-1 rounded-lg hover:bg-theme-sidebar-surface transition-colors text-white"
+            className="p-2 rounded-lg hover:bg-white/10 transition-all duration-200 text-white hover:scale-105"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         )}
       </div>
 
       {/* Navegación */}
-      <nav className="flex-1 px-2 py-4 space-y-2 overflow-y-auto">
+      <nav className="flex-1 px-2 py-4 space-y-2 overflow-y-auto custom-scrollbar">
         {navGroups.map((group) => (
           <div key={group.title} className={`${collapsed && !isMobile ? 'mb-4' : 'mb-6'}`}>
             {(!collapsed || isMobile) && (
@@ -255,28 +271,45 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
           </div>
         ))}
 
-        {/* Información del usuario y logout */}
+        {/* Información del usuario y logout mejorado */}
         {(!collapsed || isMobile) && (
           <div className="mb-4 px-2">
-            <div className="bg-theme-sidebar-surface rounded-lg p-3 border border-theme-sidebar">
-              <div className="flex items-center space-x-3 mb-3">
-                <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-semibold">
-                    {user?.nombre_completo?.charAt(0) || user?.username?.charAt(0) || 'U'}
-                  </span>
-                </div>
+            <div className="bg-gradient-to-br from-theme-sidebar-surface/90 to-theme-sidebar-surface/70 rounded-xl p-4 border border-theme-sidebar/30 shadow-xl backdrop-blur-sm sidebar-glass">
+              {/* Avatar y información del usuario */}
+              <div className="flex items-center space-x-4 mb-4">
+                <button
+                  onClick={() => setUserProfileModalOpen(true)}
+                  className="relative group cursor-pointer"
+                >
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 border-2 border-white/20">
+                    <span className="text-white text-lg font-bold">
+                      {user?.nombre_completo?.charAt(0) || user?.username?.charAt(0) || 'U'}
+                    </span>
+                  </div>
+                  {/* Indicador de estado online */}
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 border-2 border-theme-sidebar-surface rounded-full animate-pulse"></div>
+                  {/* Tooltip */}
+                  <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                    Ver perfil
+                  </div>
+                </button>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-theme-sidebar-primary truncate">
+                  <p className="text-sm font-semibold text-theme-sidebar truncate leading-tight">
                     {user?.nombre_completo || user?.username}
                   </p>
-                  <p className="text-xs text-theme-sidebar-secondary capitalize">
-                    {user?.rol || 'Usuario'}
-                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <p className="text-xs text-theme-sidebar-secondary capitalize font-medium">
+                      {user?.rol || 'Usuario'}
+                    </p>
+                  </div>
                 </div>
               </div>
+              
+              {/* Botón de cerrar sesión mejorado */}
               <button
                 onClick={logout}
-                className="w-full flex items-center justify-center px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-md transition-colors"
+                className="w-full flex items-center justify-center px-4 py-3 text-sm font-medium text-red-400 hover:text-white hover:bg-gradient-to-r hover:from-red-500 hover:to-red-600 rounded-lg transition-all duration-300 transform hover:scale-[1.02] shadow-md hover:shadow-lg border border-red-500/20 hover:border-red-500/40"
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -401,7 +434,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
         {/* Botón hamburguesa */}
         <button
           onClick={toggleMobileSidebar}
-          className="fixed top-4 left-4 z-50 p-2 bg-theme-primary text-white rounded-lg shadow-lg lg:hidden"
+          className="fixed top-4 left-4 z-50 p-2 bg-theme-primary text-white rounded-lg shadow-lg lg:hidden hover:scale-105 transition-transform duration-200"
         >
           <Menu size={20} />
         </button>
@@ -409,7 +442,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
         {/* Overlay */}
         {mobileOpen && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden backdrop-blur-sm"
             onClick={closeMobileSidebar}
           />
         )}
@@ -417,7 +450,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
         {/* Sidebar móvil */}
         <div
           className={`
-            fixed left-0 top-0 h-full w-64 bg-theme-sidebar z-50 transform transition-transform duration-300 ease-in-out lg:hidden
+            fixed left-0 top-0 h-full w-64 bg-theme-sidebar sidebar-glass sidebar-depth z-50 transform transition-transform duration-300 ease-in-out lg:hidden
             ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
           `}
         >
@@ -429,6 +462,14 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
           isOpen={settingsPanelOpen} 
           onClose={() => setSettingsPanelOpen(false)} 
         />
+
+        {/* Modal de perfil de usuario */}
+        <UserProfileModal
+          isOpen={userProfileModalOpen}
+          onClose={() => setUserProfileModalOpen(false)}
+          user={user}
+          onLogout={logout}
+        />
       </>
     );
   }
@@ -438,7 +479,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
     <>
       <div
         className={`
-          fixed left-0 top-0 h-full bg-theme-sidebar z-30 transition-all duration-300 ease-in-out
+          fixed left-0 top-0 h-full bg-theme-sidebar sidebar-glass sidebar-depth z-30 transition-all duration-300 ease-in-out
           ${collapsed ? 'w-16' : 'w-64'}
         `}
       >
@@ -449,6 +490,14 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
       <SettingsPanel 
         isOpen={settingsPanelOpen} 
         onClose={() => setSettingsPanelOpen(false)} 
+      />
+
+      {/* Modal de perfil de usuario */}
+      <UserProfileModal
+        isOpen={userProfileModalOpen}
+        onClose={() => setUserProfileModalOpen(false)}
+        user={user}
+        onLogout={logout}
       />
     </>
   );

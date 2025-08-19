@@ -85,7 +85,26 @@ const defaultSettings = {
   sidebarCollapsed: false,
   notifications: true,
   animations: true,
-  compactMode: false
+  compactMode: false,
+  // Configuración de marca personalizada
+  customBrand: {
+    logo: null, // URL de la imagen del logo
+    companyName: 'Carolina González',
+    showLogo: true,
+    showCompanyName: true
+  },
+  // Configuración de datos de empresa para PDFs
+  companyData: {
+    nombre: 'Carolina González Sarta',
+    direccion: 'Cra 7 # 15 57 local 101',
+    telefono: '3147435305',
+    email: 'carolina.gonzalez@localix.com',
+    nit: '1088297299-0',
+    ruc: '1088297299-0',
+    web: 'www.carolinagonzalez.com',
+    ciudad: 'Bogotá',
+    pais: 'Colombia'
+  }
 };
 
 const SettingsContext = createContext();
@@ -131,6 +150,36 @@ export const SettingsProvider = ({ children }) => {
     toggleNotifications: () => setSettings(prev => ({ ...prev, notifications: !prev.notifications })),
     toggleAnimations: () => setSettings(prev => ({ ...prev, animations: !prev.animations })),
     toggleCompactMode: () => setSettings(prev => ({ ...prev, compactMode: !prev.compactMode })),
+    // Funciones para configuración de marca
+    updateCustomBrand: (brandSettings) => setSettings(prev => ({
+      ...prev,
+      customBrand: { ...prev.customBrand, ...brandSettings }
+    })),
+    updateLogo: (logoUrl) => setSettings(prev => ({
+      ...prev,
+      customBrand: { ...prev.customBrand, logo: logoUrl }
+    })),
+    updateCompanyName: (name) => setSettings(prev => ({
+      ...prev,
+      customBrand: { ...prev.customBrand, companyName: name }
+    })),
+    toggleLogoVisibility: () => setSettings(prev => ({
+      ...prev,
+      customBrand: { ...prev.customBrand, showLogo: !prev.customBrand.showLogo }
+    })),
+    toggleCompanyNameVisibility: () => setSettings(prev => ({
+      ...prev,
+      customBrand: { ...prev.customBrand, showCompanyName: !prev.customBrand.showCompanyName }
+    })),
+    // Funciones para configuración de datos de empresa
+    updateCompanyData: (companyData) => setSettings(prev => ({
+      ...prev,
+      companyData: { ...prev.companyData, ...companyData }
+    })),
+    updateCompanyField: (field, value) => setSettings(prev => ({
+      ...prev,
+      companyData: { ...prev.companyData, [field]: value }
+    })),
     resetSettings: () => setSettings(defaultSettings),
     isLoading
   }), [settings, isLoading]);

@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { getLogoBase64, createSimpleLogo } from './logoConfig.js';
+import { getCompanyData } from './companyConfig.js';
 
 // Función para cargar la imagen de fondo
 const loadBackgroundImage = async () => {
@@ -112,14 +113,9 @@ const getLogo = async () => {
   }
 };
 
-// Configuración de la tienda
-const TIENDA_CONFIG = {
-  nombre: 'Carolina González Sarta',
-  direccion: 'Cra 7 # 15 57 local 101',
-  telefono: '3147435305',
-  email: 'carolina.gonzalez@localix.com',
-  ruc: '1088297299-0',
-  web: 'www.carolinagonzalez.com'
+// Función para obtener la configuración de la tienda
+const getTiendaConfig = () => {
+  return getCompanyData();
 };
 
 // Función para crear el HTML del recibo
@@ -128,6 +124,9 @@ const createReciboHTML = (venta, logoImage, backgroundImage) => {
   const clienteNombre = venta.cliente?.nombre || venta.cliente_nombre || 'Cliente General';
   const clienteTelefono = venta.cliente?.telefono || '';
   const clienteEmail = venta.cliente?.email || '';
+  
+  // Obtener configuración de la tienda
+  const TIENDA_CONFIG = getTiendaConfig();
   
   // Calcular subtotal
   const subtotal = venta.items?.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0) || 0;

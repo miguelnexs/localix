@@ -61,6 +61,24 @@ const CustomerModal = ({ isOpen, onClose, onSave, customer }) => {
       // Validar datos del formulario
       if (!formData.nombre?.trim()) {
         toast.error('El nombre es obligatorio');
+        setLoading(false);
+        return;
+      }
+      
+      // Verificar que la API esté disponible
+      if (!window.clientesAPI) {
+        console.error('❌ window.clientesAPI no está disponible');
+        toast.error('Error: API de clientes no disponible. Por favor, reinicia la aplicación.');
+        setLoading(false);
+        return;
+      }
+      
+      // Verificar que el método crear esté disponible
+      if (typeof window.clientesAPI.crear !== 'function') {
+        console.error('❌ window.clientesAPI.crear no es una función');
+        console.log('🔍 Métodos disponibles:', Object.keys(window.clientesAPI));
+        toast.error('Error: Método de creación no disponible. Por favor, reinicia la aplicación.');
+        setLoading(false);
         return;
       }
       
@@ -72,17 +90,39 @@ const CustomerModal = ({ isOpen, onClose, onSave, customer }) => {
         response = await window.clientesAPI.actualizar(customer.id, formData);
       } else {
         // Crear nuevo cliente
+        console.log('Creando nuevo cliente...');
         response = await window.clientesAPI.crear(formData);
       }
       
-      if (response.success) {
+      console.log('Respuesta de la API:', response);
+      
+      if (response && response.success) {
         onSave(response.data);
+        toast.success(`Cliente ${customer ? 'actualizado' : 'creado'} exitosamente`);
       } else {
-        toast.error(`Error al ${customer ? 'actualizar' : 'crear'} cliente: ${response.error}`);
+        const errorMessage = response?.error || 'Error desconocido';
+        console.error('Error en la respuesta:', errorMessage);
+        toast.error(`Error al ${customer ? 'actualizar' : 'crear'} cliente: ${errorMessage}`);
       }
     } catch (error) {
       console.error(`Error ${customer ? 'actualizando' : 'creando'} cliente:`, error);
-      toast.error(`Error al ${customer ? 'actualizar' : 'crear'} cliente`);
+      
+      // Proporcionar información más específica sobre el error
+      let errorMessage = 'Error desconocido';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.toString) {
+        errorMessage = error.toString();
+      }
+      
+      console.log('🔍 Información adicional del error:');
+      console.log('  - Tipo de error:', error.constructor.name);
+      console.log('  - Stack trace:', error.stack);
+      console.log('  - window.clientesAPI disponible:', !!window.clientesAPI);
+      console.log('  - window.clientesAPI.crear disponible:', !!(window.clientesAPI && window.clientesAPI.crear));
+      
+      toast.error(`Error al ${customer ? 'actualizar' : 'crear'} cliente: ${errorMessage}`);
     } finally {
       setLoading(false);
     }

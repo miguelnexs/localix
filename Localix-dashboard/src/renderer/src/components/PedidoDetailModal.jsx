@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Package, User, Calendar, MapPin, Phone, FileText, Truck, CheckCircle, Clock } from 'lucide-react';
+import { X, Package, User, Calendar, MapPin, Phone, FileText, Truck, CheckCircle, Clock, Download } from 'lucide-react';
 import { getHistorialPedido, cambiarEstadoPedido } from '../main/handlers/pedidoHandlers';
+import { generarReportePedido } from '../utils/pedidoPDFGenerator';
 import { toast } from 'react-toastify';
 
 const ESTADOS_PEDIDO = [
@@ -22,6 +23,7 @@ const PedidoDetailModal = ({ pedido, isOpen, onClose, onEstadoCambiado }) => {
   const [showEstadoEdit, setShowEstadoEdit] = useState(false);
   const [nuevoEstado, setNuevoEstado] = useState('');
   const [cambiandoEstado, setCambiandoEstado] = useState(false);
+  const [generandoPDF, setGenerandoPDF] = useState(false);
 
   useEffect(() => {
     if (isOpen && pedido) {
@@ -118,6 +120,19 @@ const PedidoDetailModal = ({ pedido, isOpen, onClose, onEstadoCambiado }) => {
       toast.error('Error al cambiar el estado');
     } finally {
       setCambiandoEstado(false);
+    }
+  };
+
+  const handleGenerarPDF = async () => {
+    setGenerandoPDF(true);
+    try {
+      await generarReportePedido(pedido, false);
+      toast.success('Reporte PDF generado exitosamente');
+    } catch (error) {
+      console.error('Error generando PDF:', error);
+      toast.error('Error al generar el reporte PDF');
+    } finally {
+      setGenerandoPDF(false);
     }
   };
 
@@ -472,7 +487,16 @@ const PedidoDetailModal = ({ pedido, isOpen, onClose, onEstadoCambiado }) => {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 p-6 border-t border-theme-border">
+        <div className="flex justify-between items-center gap-3 p-6 border-t border-theme-border">
+          <button
+            onClick={handleGenerarPDF}
+            disabled={generandoPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            <Download size={16} />
+            {generandoPDF ? 'Generando...' : 'Generar PDF'}
+          </button>
+          
           <button
             onClick={onClose}
             className="px-4 py-2 text-theme-textSecondary bg-theme-secondary rounded-lg hover:bg-theme-border transition-colors"

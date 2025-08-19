@@ -32,7 +32,7 @@ const DashboardPage = React.memo(() => {
     totalPedidos = 0,
     totalClientes = 0,
     totalProductos = 0,
-    ticketPromedio = 0,
+    gananciaTotal = 0,
     pedidosEntregados = 0
   } = dashboardData.resumen || {};
 
@@ -313,21 +313,21 @@ const DashboardPage = React.memo(() => {
             </div>
           </div>
 
-          {/* Ticket Promedio */}
+          {/* Ganancia Total */}
           <div className="bg-theme-surface rounded-xl border border-theme-border p-6 hover:shadow-lg transition-all duration-200">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm font-medium text-theme-textSecondary mb-1">Ticket Promedio</p>
+                <p className="text-sm font-medium text-theme-textSecondary mb-1">Ganancia Total</p>
                 <p className="text-2xl font-bold text-theme-text">
-                  ${ticketPromedio.toLocaleString('es-CO', {minimumFractionDigits: 2})}
+                  ${gananciaTotal.toLocaleString('es-CO', {minimumFractionDigits: 2})}
                 </p>
-                <div className="flex items-center mt-2 text-indigo-600 text-xs">
+                <div className="flex items-center mt-2 text-green-600 text-xs">
                   <TrendingUp className="w-3 h-3 mr-1" />
-                  <span>Por venta</span>
+                  <span>Beneficio neto</span>
                 </div>
               </div>
-              <div className="p-3 bg-indigo-100 rounded-xl">
-                <CreditCard className="w-6 h-6 text-indigo-600" />
+              <div className="p-3 bg-green-100 rounded-xl">
+                <DollarSign className="w-6 h-6 text-green-600" />
               </div>
             </div>
           </div>
@@ -430,6 +430,87 @@ const DashboardPage = React.memo(() => {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Productos con Mayor Ganancia */}
+        <div className="bg-theme-surface rounded-xl border border-theme-border overflow-hidden mb-8">
+          <div className="p-6 border-b border-theme-border">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-theme-text">Productos con Mayor Ganancia</h3>
+              <button 
+                onClick={() => navigate('/products')}
+                className="text-sm text-theme-accent hover:text-opacity-80 font-medium transition-colors"
+              >
+                Ver todos
+              </button>
+            </div>
+          </div>
+          
+          {dashboardData.estadisticas.filter(producto => producto.precio && producto.costo).length === 0 ? (
+            <div className="p-12 text-center">
+              <Package className="w-16 h-16 text-theme-textSecondary mx-auto mb-4" />
+              <h4 className="text-lg font-medium text-theme-text mb-2">No hay datos de ganancia</h4>
+              <p className="text-theme-textSecondary text-sm mb-6">Agrega costos a tus productos para ver las ganancias</p>
+              <button 
+                onClick={() => navigate('/products')}
+                className="bg-theme-primary hover:bg-theme-accent text-white px-6 py-3 rounded-lg text-sm font-medium transition-colors"
+              >
+                Gestionar productos
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-theme-secondary">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">Producto</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">Precio Venta</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">Costo</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">Ganancia Unit.</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">Margen %</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-theme-textSecondary uppercase tracking-wider">Stock</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-theme-border">
+                  {dashboardData.estadisticas
+                    .filter(producto => producto.precio && producto.costo)
+                    .sort((a, b) => {
+                      const gananciaA = parseFloat(a.precio) - parseFloat(a.costo);
+                      const gananciaB = parseFloat(b.precio) - parseFloat(b.costo);
+                      return gananciaB - gananciaA;
+                    })
+                    .slice(0, 5)
+                    .map(producto => {
+                      const precio = parseFloat(producto.precio);
+                      const costo = parseFloat(producto.costo);
+                      const ganancia = precio - costo;
+                      const margen = costo > 0 ? ((ganancia / costo) * 100) : 0;
+                      
+                      return (
+                        <tr key={producto.id} className="hover:bg-theme-secondary cursor-pointer transition-colors" onClick={() => navigate(`/products/${producto.id}`)}>
+                          <td className="px-6 py-4 text-sm font-medium text-theme-text">{producto.nombre}</td>
+                          <td className="px-6 py-4 text-sm text-theme-textSecondary">
+                            ${precio.toLocaleString('es-CO', {minimumFractionDigits: 2})}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-theme-textSecondary">
+                            ${costo.toLocaleString('es-CO', {minimumFractionDigits: 2})}
+                          </td>
+                          <td className="px-6 py-4 text-sm font-medium text-green-600">
+                            ${ganancia.toLocaleString('es-CO', {minimumFractionDigits: 2})}
+                          </td>
+                          <td className="px-6 py-4 text-sm font-medium text-green-600">
+                            {margen.toFixed(1)}%
+                          </td>
+                          <td className="px-6 py-4 text-sm text-theme-textSecondary">
+                            {producto.stock || 0}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Pedidos Recientes - MEJOR DISEÑO */}

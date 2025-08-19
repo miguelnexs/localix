@@ -5,7 +5,7 @@ import {
   Package, Filter, ArrowUpDown, ChevronDown, ChevronUp,
   CheckCircle, Edit as EditIcon, AlertTriangle, XCircle, TrendingUp, Package2,
   FolderOpen, Settings, Clock, Truck, User, Calendar, DollarSign,
-  MapPin, Phone, FileText, CheckSquare, XSquare, Clock as ClockIcon
+  MapPin, Phone, FileText, CheckSquare, XSquare, Clock as ClockIcon, Download
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { 
@@ -15,8 +15,9 @@ import {
   cambiarEstadoPedido,
   getHistorialPedido 
 } from '../main/handlers/pedidoHandlers';
+import { generarReportePedido } from '../utils/pedidoPDFGenerator';
 import PedidoDetailModal from '../components/PedidoDetailModal';
-import { generarPDFPedido } from '../utils/pedidoPDFGenerator.js';
+
 
 
 
@@ -47,6 +48,8 @@ const OrdersPage = () => {
     error: null
   });
   
+  const [generandoPDF, setGenerandoPDF] = useState(false);
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'fecha_creacion', direction: 'desc' });
   const [filterStatus, setFilterStatus] = useState('todos');
@@ -61,7 +64,7 @@ const OrdersPage = () => {
   });
 
   // Configuración de columnas para la tabla estandarizada
-  const getPedidoColumns = (onView, onEdit, onDelete, onPrint) => [
+  const getPedidoColumns = (onView, onDelete, onPrint = null) => [
     {
       key: 'pedido',
       label: 'Pedido',
@@ -162,10 +165,10 @@ const OrdersPage = () => {
       render: (pedido) => (
         <ActionButtons
           onView={() => onView(pedido)}
-          onEdit={() => onEdit(pedido)}
           onDelete={() => onDelete(pedido)}
-          onPrint={() => onPrint(pedido)}
-          showPrint={true}
+          onPrint={onPrint ? () => onPrint(pedido) : undefined}
+          showPrint={!!onPrint}
+          showEdit={false}
           size="sm"
           variant="compact"
         />
@@ -522,26 +525,20 @@ const OrdersPage = () => {
     }
   };
 
-  const handlePrintPedido = async (pedido) => {
+  const handleGenerarPDF = async (pedido) => {
+    setGenerandoPDF(true);
     try {
-      console.log('🖨️ Iniciando generación de PDF para pedido:', pedido.numero_pedido);
-      
-      // Usar el nuevo generador de PDFs con HTML
-      await generarPDFPedido(pedido, true);
-      
-      toast.success(`PDF del pedido ${pedido.numero_pedido} generado exitosamente`, {
-        position: "top-right",
-        autoClose: 3000,
-      });
-      
+      await generarReportePedido(pedido, false);
+      toast.success('Reporte PDF generado exitosamente');
     } catch (error) {
-      console.error('❌ Error al generar PDF del pedido:', error);
-      toast.error('Error al generar el PDF del pedido: ' + (error.message || 'Error desconocido'), {
-        position: "top-right",
-        autoClose: 5000,
-      });
+      console.error('Error generando PDF:', error);
+      toast.error('Error al generar el reporte PDF');
+    } finally {
+      setGenerandoPDF(false);
     }
   };
+
+
 
   // Función para obtener el color del estado
   const getEstadoColor = (estado) => {
@@ -710,14 +707,20 @@ const OrdersPage = () => {
             <Edit size={14} />
             <span className="text-xs">Editar</span>
           </button> */}
+
           <button
-            onClick={() => handlePrintPedido(pedido)}
-            className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-            title="Imprimir pedido en PDF"
+            onClick={async (e) => {
+              e.stopPropagation();
+              await handleGenerarPDF(pedido);
+            }}
+            disabled={generandoPDF}
+            className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors disabled:opacity-50"
+            title="Generar PDF del pedido"
           >
-            <FileText size={14} />
+            <Download size={14} />
             <span className="text-xs">PDF</span>
           </button>
+
           <button
             onClick={async (e) => {
               e.stopPropagation();
@@ -736,39 +739,7 @@ const OrdersPage = () => {
     </tr>
   );
 
-  // Función de prueba para el PDF de pedidos
-  const testPedidoPDF = async () => {
-    console.log('🧪 Iniciando prueba de PDF de pedido...');
-    
-    const testPedido = {
-      numero_pedido: 'TEST-001',
-      fecha_creacion: new Date().toISOString(),
-      cliente_nombre: 'Cliente de Prueba',
-      estado_pedido: 'pendiente',
-      metodo_pago: 'efectivo',
-      items: [
-        {
-          producto_nombre: 'Producto de Prueba',
-          sku: 'SKU-001',
-          cantidad: 2,
-          precio_unitario: 100,
-          subtotal: 200
-        }
-      ]
-    };
-    
-    try {
-      await handlePrintPedido(testPedido);
-      console.log('✅ Prueba de PDF completada');
-    } catch (error) {
-      console.error('❌ Error en la prueba:', error);
-    }
-  };
 
-  // Exponer la función de prueba globalmente
-  if (typeof window !== 'undefined') {
-    window.testPedidoPDF = testPedidoPDF;
-  }
 
   if (loading.initialLoad) return renderLoadingState();
   if (ui.error) return renderErrorState();
@@ -881,7 +852,7 @@ const OrdersPage = () => {
       {/* Tabla de Pedidos estandarizada */}
       <div className="max-w-7xl mx-auto px-6 mb-6">
         <DataTable
-          columns={getPedidoColumns(openDialogFor, null, handleDelete, handlePrintPedido)}
+          columns={getPedidoColumns(openDialogFor, handleDelete, null)}
           data={filteredPedidos || []}
           sortConfig={sortConfig}
           onSort={requestSort}

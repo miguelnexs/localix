@@ -200,8 +200,25 @@ try {
     
     console.log('[MAIN] 👥 Configurando handlers de clientes...');
     try {
-      clienteHandlers.initializeClienteHandlers();
-      console.log('[MAIN] ✅ Handlers de clientes configurados exitosamente');
+      const clientesOk = clienteHandlers.initializeClienteHandlers();
+      if (clientesOk) {
+        console.log('[MAIN] ✅ Handlers de clientes configurados exitosamente');
+      } else {
+        console.error('[MAIN] ❌ CRÍTICO: Handlers de clientes no se registraron correctamente');
+        
+        // Intentar registrar manualmente
+        console.log('[MAIN] 🔧 Intentando registro manual de handlers...');
+        try {
+          const resultado = clienteHandlers.verificarHandlersRegistrados();
+          if (resultado) {
+            console.log('[MAIN] ✅ Handlers verificados manualmente');
+          } else {
+            console.error('[MAIN] ❌ CRÍTICO: Los handlers siguen sin estar registrados');
+          }
+        } catch (manualError) {
+          console.error('[MAIN] ❌ Error en verificación manual:', manualError);
+        }
+      }
     } catch (error) {
       console.error('[MAIN] ❌ Error configurando handlers de clientes:', error);
     }

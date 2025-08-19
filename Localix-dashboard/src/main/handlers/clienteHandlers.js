@@ -216,9 +216,53 @@ ipcMain.handle('clientes:obtener-estadisticas', async () => {
 console.log('🔍 [CLIENTE HANDLERS] Módulo cargado, verificando handlers...');
 console.log('🔍 [CLIENTE HANDLERS] Handlers registrados:', ipcMain.eventNames().filter(name => name.startsWith('clientes:')));
 
+// Función para verificar que todos los handlers estén registrados
+const verificarHandlersRegistrados = () => {
+  const handlersEsperados = [
+    'clientes:obtener-todos',
+    'clientes:obtener-por-id',
+    'clientes:crear',
+    'clientes:crear-rapido',
+    'clientes:actualizar',
+    'clientes:eliminar',
+    'clientes:buscar',
+    'clientes:obtener-ventas',
+    'clientes:obtener-con-ventas',
+    'clientes:obtener-estadisticas'
+  ];
+  
+  const handlersRegistrados = ipcMain.eventNames().filter(name => name.startsWith('clientes:'));
+  
+  console.log('🔍 [CLIENTE HANDLERS] Handlers esperados:', handlersEsperados);
+  console.log('🔍 [CLIENTE HANDLERS] Handlers registrados:', handlersRegistrados);
+  
+  const faltantes = handlersEsperados.filter(handler => !handlersRegistrados.includes(handler));
+  
+  if (faltantes.length > 0) {
+    console.error('❌ [CLIENTE HANDLERS] Handlers faltantes:', faltantes);
+    return false;
+  } else {
+    console.log('✅ [CLIENTE HANDLERS] Todos los handlers están registrados');
+    return true;
+  }
+};
+
 module.exports = {
   initializeClienteHandlers: () => {
     console.log('🔍 [CLIENTE HANDLERS] Inicializando handlers de clientes...');
-    console.log('🔍 [CLIENTE HANDLERS] Handlers disponibles:', ipcMain.eventNames().filter(name => name.startsWith('clientes:')));
-  }
+    
+    // Verificar que los handlers estén registrados
+    const handlersOk = verificarHandlersRegistrados();
+    
+    if (!handlersOk) {
+      console.error('❌ [CLIENTE HANDLERS] CRÍTICO: Algunos handlers no están registrados');
+      console.log('🔍 [CLIENTE HANDLERS] Handlers disponibles:', ipcMain.eventNames().filter(name => name.startsWith('clientes:')));
+    } else {
+      console.log('✅ [CLIENTE HANDLERS] Todos los handlers de clientes están listos');
+    }
+    
+    return handlersOk;
+  },
+  
+  verificarHandlersRegistrados
 }; 

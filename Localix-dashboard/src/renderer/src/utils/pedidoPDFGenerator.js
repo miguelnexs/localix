@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { getLogoBase64, createSimpleLogo } from './logoConfig.js';
+import { getCompanyData } from './companyConfig.js';
 
 // Función para cargar la imagen de fondo
 const loadBackgroundImage = async () => {
@@ -112,17 +113,12 @@ const getLogo = async () => {
   }
 };
 
-// Configuración de la tienda
-const TIENDA_CONFIG = {
-  nombre: 'Carolina González Sarta',
-  direccion: 'Cra 7 # 15 57 local 101',
-  telefono: '3147435305',
-  email: 'carolina.gonzalez@localix.com',
-  ruc: '1088297299-0',
-  web: 'www.carolinagonzalez.com'
+// Función para obtener la configuración de la tienda
+const getTiendaConfig = () => {
+  return getCompanyData();
 };
 
-// Función para obtener el texto del estado del pedido
+// Función para obtener el texto del estado
 const getEstadoText = (estado) => {
   switch (estado) {
     case 'pendiente':
@@ -138,7 +134,7 @@ const getEstadoText = (estado) => {
     case 'cancelado':
       return 'Cancelado';
     default:
-      return estado || 'Pendiente';
+      return estado;
   }
 };
 
@@ -146,67 +142,47 @@ const getEstadoText = (estado) => {
 const getEstadoColor = (estado) => {
   switch (estado) {
     case 'pendiente':
-      return '#fbbf24'; // Amarillo
+      return '#fef3c7';
     case 'confirmado':
-      return '#3b82f6'; // Azul
+      return '#dbeafe';
     case 'en_preparacion':
-      return '#f97316'; // Naranja
+      return '#fed7aa';
     case 'enviado':
-      return '#8b5cf6'; // Púrpura
+      return '#e9d5ff';
     case 'entregado':
-      return '#10b981'; // Verde
+      return '#dbeafe';
     case 'cancelado':
-      return '#ef4444'; // Rojo
+      return '#fecaca';
     default:
-      return '#6b7280'; // Gris
+      return '#f3f4f6';
   }
 };
 
-// Función para crear el HTML del pedido
+// Función para crear el HTML del reporte de pedido
 const createPedidoHTML = (pedido, logoImage, backgroundImage) => {
-  const fecha = pedido.fecha_creacion ? new Date(pedido.fecha_creacion).toLocaleString('es-ES') : new Date().toLocaleString('es-ES');
-  const clienteNombre = pedido.cliente?.nombre || pedido.cliente_nombre || 'Cliente General';
+  const fecha = new Date(pedido.fecha_creacion).toLocaleString('es-ES');
+  const clienteNombre = pedido.cliente?.nombre || pedido.venta?.cliente_nombre || 'Cliente General';
   const clienteTelefono = pedido.cliente?.telefono || pedido.telefono_contacto || '';
   const clienteEmail = pedido.cliente?.email || '';
-  const clienteDireccion = pedido.cliente?.direccion || pedido.direccion_entrega || '';
+  
+  // Obtener configuración de la tienda
+  const TIENDA_CONFIG = getTiendaConfig();
   
   // Calcular subtotal
   const subtotal = pedido.items?.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0) || 0;
   
   // Generar filas de productos
   const productosHTML = pedido.items?.map(item => {
-    const nombre = (item.producto && item.producto.nombre) || item.producto_nombre || 'Producto';
-    const sku = (item.producto && item.producto.sku) || item.sku || '';
-    
-    // Obtener nombre del color
-    let colorNombre = '';
-    if (item.color) {
-      if (typeof item.color === 'object' && item.color.nombre) {
-        colorNombre = item.color.nombre;
-      } else if (typeof item.color === 'string') {
-        colorNombre = item.color;
-      }
-    } else if (item.producto) {
-      if (item.producto.variante && (item.producto.variante.color_nombre || item.producto.variante.color)) {
-        colorNombre = item.producto.variante.color_nombre || item.producto.variante.color;
-      } else if (item.producto.color_nombre || item.producto.color) {
-        colorNombre = item.producto.color_nombre || item.producto.color;
-      }
-    } else if (item.variante && (item.variante.color_nombre || item.variante.color)) {
-      colorNombre = item.variante.color_nombre || item.variante.color;
-    } else if (item.color_nombre || item.color) {
-      colorNombre = item.color_nombre || item.color;
-    }
-    
+    const nombre = item.producto?.nombre || item.producto_nombre || 'Producto';
+    const color = item.color?.nombre || '';
     const cantidad = item.cantidad || 0;
     const precio = parseFloat(item.precio_unitario || 0);
     const total = parseFloat(item.subtotal || 0);
+    const nombreCompleto = color ? `${nombre} (${color})` : nombre;
     
     return `
       <tr>
-        <td class="producto-nombre">${nombre}</td>
-        <td class="sku">${sku}</td>
-        <td class="color">${colorNombre}</td>
+        <td class="producto-nombre">${nombreCompleto}</td>
         <td class="cantidad">${cantidad}</td>
         <td class="precio">$${precio.toFixed(2)}</td>
         <td class="total">$${total.toFixed(2)}</td>
@@ -220,7 +196,7 @@ const createPedidoHTML = (pedido, logoImage, backgroundImage) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Pedido</title>
+        <title>Reporte de Pedido</title>
         <style>
             @page {
                 size: A4;
@@ -332,16 +308,6 @@ const createPedidoHTML = (pedido, logoImage, backgroundImage) => {
                 color: #666;
             }
             
-            .estado-badge {
-                display: inline-block;
-                padding: 5px 12px;
-                border-radius: 20px;
-                color: white;
-                font-weight: bold;
-                font-size: 12px;
-                background-color: ${getEstadoColor(pedido.estado_pedido)};
-            }
-            
             .cliente-info {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
@@ -365,39 +331,31 @@ const createPedidoHTML = (pedido, logoImage, backgroundImage) => {
                 color: #333;
             }
             
-            /* Información de entrega */
-            ${pedido.direccion_entrega || pedido.telefono_contacto || pedido.instrucciones_entrega ? `
-            .entrega-info {
-                background: white;
-                border: 2px solid #dee2e6;
-                border-radius: 10px;
+            /* Estado del pedido */
+            .estado-section {
+                background: ${getEstadoColor(pedido.estado_pedido)};
+                border-radius: 8px;
                 padding: 15px;
-                margin-bottom: 20px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                margin-bottom: 15px;
+                border: 2px solid #dee2e6;
             }
             
-            .entrega-info h3 {
-                color: #333;
-                font-size: 16px;
-                margin-bottom: 10px;
-                border-bottom: 1px solid #dee2e6;
-                padding-bottom: 5px;
+            .estado-info {
+                display: flex;
+                align-items: center;
+                gap: 10px;
             }
             
-            .entrega-item {
-                margin-bottom: 8px;
-            }
-            
-            .entrega-label {
+            .estado-label {
                 font-weight: bold;
                 color: #333;
-                margin-right: 10px;
             }
             
-            .entrega-valor {
+            .estado-valor {
                 color: #333;
+                font-weight: 500;
+                text-transform: uppercase;
             }
-            ` : ''}
             
             /* Tabla de productos */
             .productos-section {
@@ -417,16 +375,16 @@ const createPedidoHTML = (pedido, logoImage, backgroundImage) => {
             .productos-table th {
                 background: linear-gradient(135deg, #f8f9fa, #e9ecef);
                 color: #333;
-                padding: 15px 8px;
+                padding: 15px 10px;
                 text-align: left;
                 font-weight: bold;
-                font-size: 12px;
+                font-size: 14px;
             }
             
             .productos-table td {
-                padding: 12px 8px;
+                padding: 12px 10px;
                 border-bottom: 1px solid #f0f0f0;
-                font-size: 11px;
+                font-size: 13px;
             }
             
             .productos-table tr:nth-child(even) {
@@ -440,19 +398,6 @@ const createPedidoHTML = (pedido, logoImage, backgroundImage) => {
             .producto-nombre {
                 font-weight: 500;
                 color: #333;
-                max-width: 120px;
-                word-wrap: break-word;
-            }
-            
-            .sku {
-                color: #666;
-                font-family: monospace;
-                font-size: 10px;
-            }
-            
-            .color {
-                color: #333;
-                font-weight: 500;
             }
             
             .cantidad {
@@ -526,7 +471,7 @@ const createPedidoHTML = (pedido, logoImage, backgroundImage) => {
             }
             
             /* Información adicional */
-            .info-adicional {
+            .adicional-section {
                 background: white;
                 border: 2px solid #dee2e6;
                 border-radius: 10px;
@@ -535,32 +480,30 @@ const createPedidoHTML = (pedido, logoImage, backgroundImage) => {
                 box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             }
             
-            .info-adicional h3 {
-                color: #333;
-                font-size: 16px;
-                margin-bottom: 10px;
-                border-bottom: 1px solid #dee2e6;
-                padding-bottom: 5px;
+            .adicional-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
             }
             
-            .info-item {
+            .adicional-item {
                 display: flex;
-                justify-content: space-between;
-                margin-bottom: 8px;
+                align-items: center;
+                gap: 10px;
             }
             
-            .info-label {
+            .adicional-label {
                 font-weight: bold;
                 color: #333;
+                min-width: 120px;
             }
             
-            .info-valor {
+            .adicional-valor {
                 color: #333;
             }
             
-            /* Observaciones */
-            ${pedido.notas ? `
-            .observaciones-section {
+            /* Fechas importantes */
+            .fechas-section {
                 background: white;
                 border: 2px solid #dee2e6;
                 border-radius: 10px;
@@ -569,18 +512,27 @@ const createPedidoHTML = (pedido, logoImage, backgroundImage) => {
                 box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             }
             
-            .observaciones-label {
-                font-weight: bold;
-                color: #333;
-                margin-bottom: 8px;
+            .fechas-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 15px;
             }
             
-            .observaciones-texto {
-                color: #333;
-                font-style: italic;
-                line-height: 1.5;
+            .fecha-item {
+                display: flex;
+                align-items: center;
+                gap: 10px;
             }
-            ` : ''}
+            
+            .fecha-label {
+                font-weight: bold;
+                color: #333;
+                min-width: 100px;
+            }
+            
+            .fecha-valor {
+                color: #333;
+            }
             
             /* Footer */
             .footer {
@@ -631,11 +583,8 @@ const createPedidoHTML = (pedido, logoImage, backgroundImage) => {
             <!-- Información del pedido -->
             <div class="pedido-info">
                 <div class="pedido-header">
-                    <div>
-                        <div class="pedido-numero">PEDIDO #${pedido.numero_pedido || ''}</div>
-                        <div class="pedido-fecha">${fecha}</div>
-                    </div>
-                    <div class="estado-badge">${getEstadoText(pedido.estado_pedido)}</div>
+                    <div class="pedido-numero">PEDIDO #${pedido.numero_pedido || pedido.id}</div>
+                    <div class="pedido-fecha">${fecha}</div>
                 </div>
                 
                 <div class="cliente-info">
@@ -655,39 +604,20 @@ const createPedidoHTML = (pedido, logoImage, backgroundImage) => {
                         <span class="cliente-valor">${clienteEmail}</span>
                     </div>
                     ` : ''}
-                    ${clienteDireccion ? `
                     <div class="cliente-item">
-                        <span class="cliente-label">Dirección:</span>
-                        <span class="cliente-valor">${clienteDireccion}</span>
+                        <span class="cliente-label">Tipo:</span>
+                        <span class="cliente-valor">${pedido.tipo_venta === 'fisica' ? 'Venta Física' : 'Venta Digital'}</span>
                     </div>
-                    ` : ''}
+                </div>
+                
+                <!-- Estado del pedido -->
+                <div class="estado-section">
+                    <div class="estado-info">
+                        <span class="estado-label">Estado del Pedido:</span>
+                        <span class="estado-valor">${getEstadoText(pedido.estado_pedido)}</span>
+                    </div>
                 </div>
             </div>
-            
-            ${pedido.direccion_entrega || pedido.telefono_contacto || pedido.instrucciones_entrega ? `
-            <!-- Información de entrega -->
-            <div class="entrega-info">
-                <h3>Información de Entrega</h3>
-                ${pedido.direccion_entrega ? `
-                <div class="entrega-item">
-                    <span class="entrega-label">Dirección:</span>
-                    <span class="entrega-valor">${pedido.direccion_entrega}</span>
-                </div>
-                ` : ''}
-                ${pedido.telefono_contacto ? `
-                <div class="entrega-item">
-                    <span class="entrega-label">Teléfono:</span>
-                    <span class="entrega-valor">${pedido.telefono_contacto}</span>
-                </div>
-                ` : ''}
-                ${pedido.instrucciones_entrega ? `
-                <div class="entrega-item">
-                    <span class="entrega-label">Instrucciones:</span>
-                    <span class="entrega-valor">${pedido.instrucciones_entrega}</span>
-                </div>
-                ` : ''}
-            </div>
-            ` : ''}
             
             <!-- Tabla de productos -->
             <div class="productos-section">
@@ -695,8 +625,6 @@ const createPedidoHTML = (pedido, logoImage, backgroundImage) => {
                     <thead>
                         <tr>
                             <th>Producto</th>
-                            <th>SKU</th>
-                            <th>Color</th>
                             <th>Cantidad</th>
                             <th>Precio Unit.</th>
                             <th>Total</th>
@@ -718,56 +646,89 @@ const createPedidoHTML = (pedido, logoImage, backgroundImage) => {
                     
                     <div class="total-item total-final">
                         <span class="total-label">TOTAL:</span>
-                        <span class="total-valor">$${pedido.total?.toFixed(2) || subtotal.toFixed(2)}</span>
+                        <span class="total-valor">$${parseFloat(pedido.total_pedido || 0).toFixed(2)}</span>
                     </div>
                 </div>
             </div>
             
             <!-- Información adicional -->
-            <div class="info-adicional">
-                <h3>Información Adicional</h3>
-                <div class="info-item">
-                    <span class="info-label">Tipo de Venta:</span>
-                    <span class="info-valor">${pedido.tipo_venta === 'fisica' ? 'Venta Física' : 'Venta Digital'}</span>
+            <div class="adicional-section">
+                <div class="adicional-grid">
+                    <div class="adicional-item">
+                        <span class="adicional-label">Estado de Pago:</span>
+                        <span class="adicional-valor">${pedido.estado_pago === 'pagado' ? 'Pagado' : 'Pendiente'}</span>
+                    </div>
+                    <div class="adicional-item">
+                        <span class="adicional-label">Método de Pago:</span>
+                        <span class="adicional-valor">${pedido.metodo_pago || 'No especificado'}</span>
+                    </div>
+                    ${pedido.codigo_seguimiento ? `
+                    <div class="adicional-item">
+                        <span class="adicional-label">Código Seguimiento:</span>
+                        <span class="adicional-valor">${pedido.codigo_seguimiento}</span>
+                    </div>
+                    ` : ''}
+                    ${pedido.empresa_envio ? `
+                    <div class="adicional-item">
+                        <span class="adicional-label">Empresa de Envío:</span>
+                        <span class="adicional-valor">${pedido.empresa_envio}</span>
+                    </div>
+                    ` : ''}
                 </div>
-                ${pedido.metodo_pago ? `
-                <div class="info-item">
-                    <span class="info-label">Método de Pago:</span>
-                    <span class="info-valor">${pedido.metodo_pago}</span>
-                </div>
-                ` : ''}
-                ${pedido.estado_pago ? `
-                <div class="info-item">
-                    <span class="info-label">Estado de Pago:</span>
-                    <span class="info-valor">${pedido.estado_pago}</span>
-                </div>
-                ` : ''}
-                ${pedido.codigo_seguimiento ? `
-                <div class="info-item">
-                    <span class="info-label">Código de Seguimiento:</span>
-                    <span class="info-valor">${pedido.codigo_seguimiento}</span>
-                </div>
-                ` : ''}
-                ${pedido.empresa_envio ? `
-                <div class="info-item">
-                    <span class="info-label">Empresa de Envío:</span>
-                    <span class="info-valor">${pedido.empresa_envio}</span>
-                </div>
-                ` : ''}
             </div>
             
+            <!-- Fechas importantes -->
+            <div class="fechas-section">
+                <div class="fechas-grid">
+                    <div class="fecha-item">
+                        <span class="fecha-label">Creación:</span>
+                        <span class="fecha-valor">${new Date(pedido.fecha_creacion).toLocaleDateString('es-ES')}</span>
+                    </div>
+                    ${pedido.fecha_confirmacion ? `
+                    <div class="fecha-item">
+                        <span class="fecha-label">Confirmación:</span>
+                        <span class="fecha-valor">${new Date(pedido.fecha_confirmacion).toLocaleDateString('es-ES')}</span>
+                    </div>
+                    ` : ''}
+                    ${pedido.fecha_envio ? `
+                    <div class="fecha-item">
+                        <span class="fecha-label">Envío:</span>
+                        <span class="fecha-valor">${new Date(pedido.fecha_envio).toLocaleDateString('es-ES')}</span>
+                    </div>
+                    ` : ''}
+                    ${pedido.fecha_entrega ? `
+                    <div class="fecha-item">
+                        <span class="fecha-label">Entrega:</span>
+                        <span class="fecha-valor">${new Date(pedido.fecha_entrega).toLocaleDateString('es-ES')}</span>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+            
+            ${pedido.instrucciones_entrega ? `
+            <!-- Instrucciones de entrega -->
+            <div class="adicional-section">
+                <div class="adicional-item">
+                    <span class="adicional-label">Instrucciones de Entrega:</span>
+                    <span class="adicional-valor">${pedido.instrucciones_entrega}</span>
+                </div>
+            </div>
+            ` : ''}
+            
             ${pedido.notas ? `
-            <!-- Observaciones -->
-            <div class="observaciones-section">
-                <div class="observaciones-label">Observaciones:</div>
-                <div class="observaciones-texto">${pedido.notas}</div>
+            <!-- Notas -->
+            <div class="adicional-section">
+                <div class="adicional-item">
+                    <span class="adicional-label">Notas:</span>
+                    <span class="adicional-valor">${pedido.notas}</span>
+                </div>
             </div>
             ` : ''}
             
             <!-- Footer -->
             <div class="footer">
-                <h3>¡Gracias por tu pedido!</h3>
-                <p>Para consultas sobre el estado de tu pedido: ${TIENDA_CONFIG.telefono}</p>
+                <h3>Reporte de Pedido</h3>
+                <p>Para consultas: ${TIENDA_CONFIG.telefono}</p>
                 <p>${TIENDA_CONFIG.web}</p>
                 <p>Generado el: ${new Date().toLocaleString('es-ES')}</p>
             </div>
@@ -788,18 +749,18 @@ const generatePDFFromHTML = async (htmlContent, fileName, format = 'a4') => {
     tempDiv.style.position = 'absolute';
     tempDiv.style.left = '-9999px';
     tempDiv.style.top = '0';
-    tempDiv.style.width = '210mm';
+    tempDiv.style.width = '210mm'; // Ancho A4
     tempDiv.style.height = 'auto';
     tempDiv.style.background = 'white';
     document.body.appendChild(tempDiv);
     
     // Convertir HTML a canvas
     const canvas = await html2canvas(tempDiv, {
-      scale: 2,
+      scale: 2, // Mejor calidad
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
-      width: 794,
+      width: 794, // 210mm en píxeles a 96 DPI
       height: tempDiv.scrollHeight,
       scrollX: 0,
       scrollY: 0
@@ -816,8 +777,8 @@ const generatePDFFromHTML = async (htmlContent, fileName, format = 'a4') => {
       format: format
     });
     
-    const imgWidth = 210;
-    const pageHeight = 297;
+    const imgWidth = 210; // Ancho A4 en mm
+    const pageHeight = 297; // Alto A4 en mm
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     
     let heightLeft = imgHeight;
@@ -848,24 +809,28 @@ const generatePDFFromHTML = async (htmlContent, fileName, format = 'a4') => {
 };
 
 /**
- * Genera un PDF de pedido usando HTML
+ * Genera un PDF de reporte para un pedido usando HTML
  * @param {Object} pedido - Datos del pedido
  * @param {boolean} autoPrint - Si debe imprimir automáticamente
  */
-export const generarPDFPedido = async (pedido, autoPrint = true) => {
+export const generarReportePedido = async (pedido, autoPrint = true) => {
   try {
-    console.log('🚀 Iniciando generación de PDF de pedido con HTML...');
+    console.log('🚀 Iniciando generación de reporte de pedido con HTML...');
     
     // Cargar imágenes
     const logoImage = await getLogo();
     const backgroundImage = await loadBackgroundImage();
     
-    // Crear HTML del pedido
+    // Crear HTML del reporte
     const htmlContent = createPedidoHTML(pedido, logoImage, backgroundImage);
     
     // Generar nombre del archivo
     const fecha = new Date().toISOString().split('T')[0];
-    const fileName = `pedido_${pedido.numero_pedido || pedido.id}_${fecha}.pdf`;
+    const hora = new Date().toLocaleTimeString('es-ES', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    }).replace(':', '-');
+    const fileName = `reporte_pedido_${pedido.numero_pedido || pedido.id}_${fecha}_${hora}.pdf`;
     
     // Generar PDF
     const pdf = await generatePDFFromHTML(htmlContent, fileName, 'a4');
@@ -886,7 +851,37 @@ export const generarPDFPedido = async (pedido, autoPrint = true) => {
     return pdf;
     
   } catch (error) {
-    console.error('❌ Error al generar PDF de pedido:', error);
+    console.error('❌ Error al generar reporte de pedido:', error);
+    throw error;
+  }
+};
+
+/**
+ * Genera un reporte simple de pedido usando HTML
+ * @param {Object} pedido - Datos del pedido
+ */
+export const generarReporteSimple = async (pedido) => {
+  try {
+    console.log('🚀 Iniciando generación de reporte simple de pedido con HTML...');
+    
+    // Cargar imágenes
+    const logoImage = await getLogo();
+    const backgroundImage = await loadBackgroundImage();
+    
+    // Crear HTML del reporte (mismo que el anterior)
+    const htmlContent = createPedidoHTML(pedido, logoImage, backgroundImage);
+    
+    // Generar nombre del archivo
+    const fecha = new Date().toISOString().split('T')[0];
+    const fileName = `reporte_simple_pedido_${pedido.numero_pedido || pedido.id}_${fecha}.pdf`;
+    
+    // Generar PDF
+    const pdf = await generatePDFFromHTML(htmlContent, fileName, 'a4');
+    
+    return pdf;
+    
+  } catch (error) {
+    console.error('❌ Error al generar reporte simple de pedido:', error);
     throw error;
   }
 };
@@ -900,51 +895,41 @@ export const testPedidoPDFGeneration = async () => {
   try {
     // Datos de prueba
     const pedidoPrueba = {
-      id: 'TEST001',
-      numero_pedido: 'PED-2024-001',
+      id: 'PED001',
+      numero_pedido: 'P-2024-001',
       fecha_creacion: new Date().toISOString(),
-      estado_pedido: 'confirmado',
-      tipo_venta: 'fisica',
+      estado_pedido: 'en_preparacion',
       estado_pago: 'pagado',
-      metodo_pago: 'Tarjeta de crédito',
+      tipo_venta: 'fisica',
+      metodo_pago: 'Efectivo',
+      total_pedido: 125.50,
       cliente: {
-        nombre: 'María González',
+        nombre: 'Cliente de Prueba',
         telefono: '3001234567',
-        email: 'maria.gonzalez@email.com',
-        direccion: 'Calle 123 # 45-67, Bogotá'
+        email: 'cliente@prueba.com'
       },
-      direccion_entrega: 'Calle 123 # 45-67, Bogotá',
-      telefono_contacto: '3001234567',
-      instrucciones_entrega: 'Entregar en horario de oficina',
       items: [
         {
-          producto: { nombre: 'Blusa Elegante', sku: 'BLU-001' },
-          color: { nombre: 'Rosa' },
+          producto: { nombre: 'Producto 1' },
+          color: { nombre: 'Rojo' },
           cantidad: 2,
-          precio_unitario: 45.50,
-          subtotal: 91.00
+          precio_unitario: 25.50,
+          subtotal: 51.00
         },
         {
-          producto: { nombre: 'Pantalón Clásico', sku: 'PAN-002' },
-          color: { nombre: 'Negro' },
+          producto: { nombre: 'Producto 2' },
           cantidad: 1,
-          precio_unitario: 65.75,
-          subtotal: 65.75
-        },
-        {
-          producto: { nombre: 'Accesorio Decorativo', sku: 'ACC-003' },
-          cantidad: 3,
-          precio_unitario: 12.25,
-          subtotal: 36.75
+          precio_unitario: 15.75,
+          subtotal: 15.75
         }
       ],
-      total: 193.50,
-      codigo_seguimiento: 'TRK-123456789',
-      empresa_envio: 'Servientrega',
-      notas: 'Pedido especial con instrucciones de empaque específicas. Cliente solicita entrega antes del mediodía.'
+      instrucciones_entrega: 'Entregar en horario de oficina',
+      notas: 'Este es un pedido de prueba para verificar la generación de PDFs.',
+      codigo_seguimiento: 'TRK123456789',
+      empresa_envio: 'Servientrega'
     };
     
-    const pdf = await generarPDFPedido(pedidoPrueba, false);
+    const pdf = await generarReportePedido(pedidoPrueba, false);
     console.log('✅ PDF de pedido de prueba generado exitosamente');
     return pdf;
     

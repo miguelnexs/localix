@@ -245,6 +245,9 @@ const CustomersPage = () => {
       // Agregar nuevo cliente
       setClientes(prevClientes => [clienteGuardado, ...prevClientes]);
     }
+    
+    // Cerrar el modal después de guardar exitosamente
+    setIsModalOpen(false);
   };
 
   // Eliminar cliente
@@ -423,15 +426,6 @@ const CustomersPage = () => {
                 }
               </p>
             </div>
-            <button
-              onClick={handleRefresh}
-              disabled={loading || refreshing}
-              className="flex items-center gap-2 px-3 py-2 bg-theme-secondary text-theme-text rounded-lg hover:bg-theme-border transition-colors"
-              title="Recargar datos"
-            >
-              <RefreshCw size={16} />
-              <span className="text-sm">Recargar</span>
-            </button>
           </div>
         </div>
       </div>
