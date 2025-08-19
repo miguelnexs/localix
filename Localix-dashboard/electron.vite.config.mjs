@@ -72,6 +72,11 @@ export default defineConfig({
           autoprefixer()
         ]
       }
+    },
+    server: {
+      hmr: {
+        overlay: false
+      }
     }
   }
 })
