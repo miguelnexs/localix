@@ -3,10 +3,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
-from .models import Pedido, ItemPedido, HistorialPedido
+from .models import Pedido, ItemPedido, HistorialPedido, EstadoPedido, Abono
 from .serializers import (
     PedidoSerializer, PedidoCreateSerializer, PedidoUpdateSerializer,
-    ItemPedidoSerializer, HistorialPedidoSerializer
+    ItemPedidoSerializer, HistorialPedidoSerializer, EstadoPedidoSerializer,
+    AbonoSerializer, AbonoCreateSerializer
 )
 from rest_framework.decorators import api_view
 
@@ -201,4 +202,187 @@ def recibir_mensaje_whatsapp(request):
     mensaje = request.data.get('mensaje')
     numero = request.data.get('numero')
     print(f"Mensaje recibido de WhatsApp: {mensaje} (de {numero})")
-    return Response({'status': 'ok', 'mensaje': mensaje, 'numero': numero}) 
+    return Response({'status': 'ok', 'mensaje': mensaje, 'numero': numero})
+
+class EstadoPedidoViewSet(viewsets.ModelViewSet):
+    queryset = EstadoPedido.objects.all().select_related('pedido', 'usuario')
+    serializer_class = EstadoPedidoSerializer
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['pedido', 'estado', 'activo']
+    ordering_fields = ['fecha_cambio']
+    ordering = ['-fecha_cambio']
+    
+    def perform_create(self, serializer):
+        serializer.save(usuario=self.request.user)
+    
+    @action(detail=False, methods=['get'])
+    def por_pedido(self, request):
+        """Obtiene todos los estados de un pedido específico"""
+        pedido_id = request.query_params.get('pedido_id')
+        if not pedido_id:
+            return Response({'error': 'pedido_id es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        estados = self.queryset.filter(pedido_id=pedido_id)
+        serializer = self.get_serializer(estados, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def estado_actual(self, request):
+        """Obtiene el estado actual de un pedido"""
+        pedido_id = request.query_params.get('pedido_id')
+        if not pedido_id:
+            return Response({'error': 'pedido_id es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        estado_actual = self.queryset.filter(pedido_id=pedido_id, activo=True).first()
+        if estado_actual:
+            serializer = self.get_serializer(estado_actual)
+            return Response(serializer.data)
+        return Response({'error': 'No se encontró estado activo'}, status=status.HTTP_404_NOT_FOUND)
+
+class AbonoViewSet(viewsets.ModelViewSet):
+    queryset = Abono.objects.all().select_related('pedido', 'usuario')
+    serializer_class = AbonoSerializer
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['pedido', 'estado_abono', 'metodo_pago']
+    ordering_fields = ['fecha_abono', 'monto']
+    ordering = ['-fecha_abono']
+    
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return AbonoCreateSerializer
+        return AbonoSerializer
+    
+    def perform_create(self, serializer):
+        serializer.save(usuario=self.request.user)
+    
+    @action(detail=False, methods=['get'])
+    def por_pedido(self, request):
+        """Obtiene todos los abonos de un pedido específico"""
+        pedido_id = request.query_params.get('pedido_id')
+        if not pedido_id:
+            return Response({'error': 'pedido_id es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        abonos = self.queryset.filter(pedido_id=pedido_id)
+        serializer = self.get_serializer(abonos, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def confirmar(self, request, pk=None):
+        """Confirma un abono"""
+        abono = self.get_object()
+        if abono.estado_abono != 'pendiente':
+            return Response(
+                {'error': 'Solo se pueden confirmar abonos pendientes'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        abono.estado_abono = 'confirmado'
+        abono.save()
+        
+        serializer = self.get_serializer(abono)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def rechazar(self, request, pk=None):
+        """Rechaza un abono"""
+        abono = self.get_object()
+        if abono.estado_abono not in ['pendiente', 'confirmado']:
+            return Response(
+                {'error': 'Solo se pueden rechazar abonos pendientes o confirmados'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        abono.estado_abono = 'rechazado'
+        abono.save()
+        
+        serializer = self.get_serializer(abono)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'])
+    def registrar_pago_separado(self, request):
+        """Registra un pago para un pedido separado"""
+        pedido_id = request.data.get('pedido_id')
+        monto = request.data.get('monto')
+        metodo_pago = request.data.get('metodo_pago', 'efectivo')
+        referencia_pago = request.data.get('referencia_pago', '')
+        notas = request.data.get('notas', '')
+        
+        if not pedido_id:
+            return Response({'error': 'pedido_id es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not monto or float(monto) <= 0:
+            return Response({'error': 'El monto debe ser mayor a 0'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            pedido = Pedido.objects.get(id=pedido_id, usuario=request.user)
+        except Pedido.DoesNotExist:
+            return Response({'error': 'Pedido no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        
+        if pedido.estado_pedido != 'separado':
+            return Response(
+                {'error': 'Solo se pueden registrar pagos en pedidos separados'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Crear el abono
+        abono = Abono.objects.create(
+            pedido=pedido,
+            monto=monto,
+            metodo_pago=metodo_pago,
+            referencia_pago=referencia_pago,
+            estado_abono='confirmado',  # Los pagos registrados se confirman automáticamente
+            usuario=request.user,
+            notas=notas or f'Pago registrado para pedido separado #{pedido.numero_pedido}'
+        )
+        
+        # Verificar si el pedido está completamente pagado
+        total_abonado = sum(a.monto for a in pedido.abonos.filter(estado_abono='confirmado'))
+        if total_abonado >= pedido.total_pedido:
+            # Cambiar estado del pedido a pendiente (ya está pagado)
+            pedido.estado_pedido = 'pendiente'
+            pedido.estado_pago = 'pagado'
+            pedido.save()
+            
+            # Crear registro de cambio de estado
+            EstadoPedido.objects.create(
+                pedido=pedido,
+                estado='pendiente',
+                usuario=request.user,
+                notas=f'Pedido completamente pagado. Total abonado: ${total_abonado}'
+            )
+        
+        serializer = self.get_serializer(abono)
+        return Response({
+            'abono': serializer.data,
+            'pedido_completamente_pagado': total_abonado >= pedido.total_pedido,
+            'total_abonado': float(total_abonado),
+            'total_pedido': float(pedido.total_pedido)
+        }, status=status.HTTP_201_CREATED)
+    
+    @action(detail=False, methods=['get'])
+    def resumen_abonos(self, request):
+        """Obtiene un resumen de abonos por pedido"""
+        pedido_id = request.query_params.get('pedido_id')
+        if not pedido_id:
+            return Response({'error': 'pedido_id es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        abonos = self.queryset.filter(pedido_id=pedido_id)
+        
+        resumen = {
+            'total_abonos': abonos.count(),
+            'total_confirmado': sum(a.monto for a in abonos.filter(estado_abono='confirmado')),
+            'total_pendiente': sum(a.monto for a in abonos.filter(estado_abono='pendiente')),
+            'total_rechazado': sum(a.monto for a in abonos.filter(estado_abono='rechazado')),
+            'abonos_por_metodo': {}
+        }
+        
+        # Agrupar por método de pago
+        for metodo, _ in Abono.METODO_PAGO_CHOICES:
+            abonos_metodo = abonos.filter(metodo_pago=metodo, estado_abono='confirmado')
+            if abonos_metodo.exists():
+                resumen['abonos_por_metodo'][metodo] = {
+                    'cantidad': abonos_metodo.count(),
+                    'total': sum(a.monto for a in abonos_metodo)
+                }
+        
+        return Response(resumen)

@@ -201,3 +201,64 @@ ipcMain.handle('ventas:obtener-resumen', async () => {
     };
   }
 });
+
+// ✅ Handlers de Reservas
+ipcMain.handle('reservas:crear', async (event, data) => {
+  try {
+    const config = await createAuthenticatedConfig();
+    const response = await axios.post(`${API_BASE_URL}/api/ventas/reservas/crear/`, data, config);
+    return { success: true, data: response.data };
+  } catch (error) {
+    return { success: false, error: error.response?.data?.error || error.message || 'Error al crear reserva' };
+  }
+});
+
+ipcMain.handle('reservas:listar', async () => {
+  try {
+    const config = await createAuthenticatedConfig();
+    const response = await axios.get(`${API_BASE_URL}/api/ventas/reservas/`, config);
+    return { success: true, data: response.data };
+  } catch (error) {
+    return { success: false, error: error.response?.data?.error || 'Error al listar reservas' };
+  }
+});
+
+ipcMain.handle('reservas:obtener', async (event, id) => {
+  try {
+    const config = await createAuthenticatedConfig();
+    const response = await axios.get(`${API_BASE_URL}/api/ventas/reservas/${id}/`, config);
+    return { success: true, data: response.data };
+  } catch (error) {
+    return { success: false, error: error.response?.data?.error || 'Error al obtener reserva' };
+  }
+});
+
+ipcMain.handle('reservas:pago', async (event, id, data) => {
+  try {
+    const config = await createAuthenticatedConfig();
+    const response = await axios.post(`${API_BASE_URL}/api/ventas/reservas/${id}/pago/`, data, config);
+    return { success: true, data: response.data };
+  } catch (error) {
+    return { success: false, error: error.response?.data?.error || 'Error al registrar pago de reserva' };
+  }
+});
+
+ipcMain.handle('reservas:finalizar', async (event, id) => {
+  try {
+    const config = await createAuthenticatedConfig();
+    const response = await axios.post(`${API_BASE_URL}/api/ventas/reservas/${id}/finalizar/`, {}, config);
+    return { success: true, data: response.data };
+  } catch (error) {
+    return { success: false, error: error.response?.data?.error || 'Error al finalizar reserva' };
+  }
+});
+
+ipcMain.handle('reservas:cancelar', async (event, id) => {
+  try {
+    const config = await createAuthenticatedConfig();
+    const response = await axios.post(`${API_BASE_URL}/api/ventas/reservas/${id}/cancelar/`, {}, config);
+    return { success: true, data: response.data };
+  } catch (error) {
+    return { success: false, error: error.response?.data?.error || 'Error al cancelar reserva' };
+  }
+});

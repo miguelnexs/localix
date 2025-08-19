@@ -510,6 +510,10 @@
 .text-theme-textMuted { color: var(--color-textMuted); }
 .text-theme-textInverse { color: var(--color-textInverse); }
 
+/* Variantes de opacidad para fondos basados en variables RGB */
+.bg-theme-accent\/10 { background-color: rgba(var(--color-accent-rgb), 0.10); }
+.bg-theme-accent\/20 { background-color: rgba(var(--color-accent-rgb), 0.20); }
+
 .border-theme-primary { border-color: var(--color-primary); }
 .border-theme-secondary { border-color: var(--color-secondary); }
 .border-theme-border { border-color: var(--color-border); }

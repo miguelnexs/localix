@@ -319,6 +319,13 @@ class VarianteProducto(models.Model):
         help_text=_("Cantidad disponible para esta variante")
     )
     
+    # ✅ Stock reservado para esta variante (por separaciones)
+    stock_reservado = models.IntegerField(
+        default=0,
+        verbose_name=_("Stock reservado (variante)"),
+        help_text=_("Unidades reservadas pendientes de completar")
+    )
+    
     orden = models.PositiveIntegerField(
         default=0,
         verbose_name=_("Orden de visualización")
@@ -365,6 +372,13 @@ class ColorProducto(models.Model):
         default=0,
         verbose_name=_("Stock del color"),
         help_text=_("Cantidad disponible para este color específico")
+    )
+    
+    # ✅ Stock reservado para este color (por separaciones)
+    stock_reservado = models.IntegerField(
+        default=0,
+        verbose_name=_("Stock reservado (color)"),
+        help_text=_("Unidades reservadas pendientes de completar")
     )
     
     orden = models.PositiveIntegerField(

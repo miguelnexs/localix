@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.core.validators import MinValueValidator
 from productos.models import Producto, VarianteProducto, ColorProducto
 from typing import TYPE_CHECKING, List, Optional, Union, cast
+from django.db import transaction
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -397,3 +398,83 @@ class ItemVenta(models.Model):
         venta_numero = str(self.venta.numero_venta) if self.venta else "Venta desconocida"
         color_info = f" - {self.color.nombre}" if self.color else ""
         return f"{producto_nombre}{color_info} x {self.cantidad} - {venta_numero}"
+
+
+class Reserva(models.Model):
+	ESTADO_CHOICES = [
+		('activa', _('Activa')),
+		('vencida', _('Vencida')),
+		('cancelada', _('Cancelada')),
+		('completada', _('Completada')),
+	]
+	usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+	cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True, related_name='reservas')
+	fecha_creacion = models.DateTimeField(auto_now_add=True)
+	fecha_vencimiento = models.DateTimeField(null=True, blank=True)
+	estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default='activa')
+	monto_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	monto_deposito = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	monto_pendiente = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	notas = models.TextField(blank=True, null=True)
+
+	def recalcular_montos(self):
+		subtotal = sum((item.subtotal for item in self.items.all()), Decimal('0.00'))
+		self.monto_total = subtotal
+		self.monto_pendiente = max(Decimal('0.00'), subtotal - self.monto_deposito)
+		self.save(update_fields=['monto_total', 'monto_pendiente'])
+
+	def __str__(self) -> str:
+		return f"Reserva #{self.id} - {self.get_estado_display()}"
+
+class ItemReserva(models.Model):
+	reserva = models.ForeignKey(Reserva, on_delete=models.CASCADE, related_name='items')
+	producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
+	variante = models.ForeignKey(VarianteProducto, on_delete=models.SET_NULL, null=True, blank=True)
+	color = models.ForeignKey(ColorProducto, on_delete=models.SET_NULL, null=True, blank=True)
+	cantidad = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+	descuento_item = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+
+	def calcular_subtotal(self) -> Decimal:
+		precio_unitario = Decimal(str(self.producto.precio))
+		if self.variante:
+			precio_unitario += Decimal(str(self.variante.precio_extra))
+		precio_total = precio_unitario * Decimal(str(self.cantidad))
+		self.subtotal = precio_total - Decimal(str(self.descuento_item or 0))
+		return self.subtotal
+
+	def save(self, *args, **kwargs):
+		creating = self.pk is None
+		self.calcular_subtotal()
+		with transaction.atomic():
+			if creating and self.producto and self.producto.gestion_stock:
+				if self.color:
+					if (self.color.stock - self.color.stock_reservado) < self.cantidad:
+						raise ValueError(f"Stock disponible insuficiente para el color {self.color.nombre}")
+					self.color.stock_reservado = max(0, self.color.stock_reservado + self.cantidad)
+					self.color.save(update_fields=['stock_reservado'])
+				elif self.variante:
+					if (self.variante.stock - self.variante.stock_reservado) < self.cantidad:
+						raise ValueError(f"Stock disponible insuficiente para la variante {self.variante.nombre}")
+					self.variante.stock_reservado = max(0, self.variante.stock_reservado + self.cantidad)
+					self.variante.save(update_fields=['stock_reservado'])
+				else:
+					# Si el producto tiene colores configurados, exigir color
+					colores_activos = self.producto.colores.filter(activo=True)
+					if colores_activos.exists():
+						raise ValueError(f"El producto {self.producto.nombre} tiene colores configurados. Debe especificar un color para reservar.")
+		super().save(*args, **kwargs)
+		self.reserva.recalcular_montos()
+
+class PagoReserva(models.Model):
+	reserva = models.ForeignKey(Reserva, on_delete=models.CASCADE, related_name='pagos')
+	monto = models.DecimalField(max_digits=12, decimal_places=2)
+	fecha = models.DateTimeField(auto_now_add=True)
+	metodo = models.CharField(max_length=20, default='efectivo')
+	usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+	def save(self, *args, **kwargs):
+		super().save(*args, **kwargs)
+		# Actualizar montos en reserva
+		self.reserva.monto_deposito = (self.reserva.monto_deposito or Decimal('0.00')) + self.monto
+		self.reserva.recalcular_montos()

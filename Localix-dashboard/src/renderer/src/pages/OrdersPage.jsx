@@ -118,7 +118,8 @@ const OrdersPage = () => {
           en_preparacion: { color: 'bg-orange-100 text-orange-800', icon: Package },
           enviado: { color: 'bg-purple-100 text-purple-800', icon: Truck },
           entregado: { color: 'bg-green-100 text-green-800', icon: CheckCircle },
-          cancelado: { color: 'bg-red-100 text-red-800', icon: XSquare }
+          cancelado: { color: 'bg-red-100 text-red-800', icon: XSquare },
+          separado: { color: 'bg-teal-100 text-teal-800', icon: DollarSign }
         };
         
         const estado = estados[pedido.estado_pedido] || estados.pendiente;
@@ -152,9 +153,15 @@ const OrdersPage = () => {
           <p className="text-sm font-medium text-theme-text">
             ${parseFloat(pedido.total_pedido || 0).toFixed(2)}
           </p>
-          <p className="text-xs text-theme-textSecondary">
-            {pedido.estado_pago === 'pagado' ? 'Pagado' : 'Pendiente'}
-          </p>
+          {pedido.estado_pedido === 'separado' ? (
+            <p className="text-xs text-teal-700">
+              Abono: ${parseFloat(pedido.monto_abono || 0).toFixed(2)} · Saldo: ${parseFloat(pedido.monto_pendiente || 0).toFixed(2)}
+            </p>
+          ) : (
+            <p className="text-xs text-theme-textSecondary">
+              {pedido.estado_pago === 'pagado' ? 'Pagado' : 'Pendiente'}
+            </p>
+          )}
         </div>
       )
     },
@@ -834,6 +841,7 @@ const OrdersPage = () => {
                 <option value="enviado">Enviados</option>
                 <option value="entregado">Entregados</option>
                 <option value="cancelado">Cancelados</option>
+                <option value="separado">Separados</option>
               </select>
               
               <button

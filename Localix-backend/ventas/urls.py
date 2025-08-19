@@ -8,12 +8,13 @@ router = DefaultRouter()
 router.register(r'clientes', views.ClienteViewSet)
 router.register(r'ventas', views.VentaViewSet)
 router.register(r'productos', views.ProductoViewSet)
+router.register(r'reservas', views.ReservaViewSet)
 
 urlpatterns = [
-    # URLs del router de DRF
-    path('', include(router.urls)),
-    # Endpoint adicional para resumen
-    path('resumen/', views.VentaViewSet.as_view({'get': 'resumen'}), name='ventas-resumen'),
+	# URLs del router de DRF
+	path('', include(router.urls)),
+	# Endpoint adicional para resumen
+	path('resumen/', views.VentaViewSet.as_view({'get': 'resumen'}), name='ventas-resumen'),
 ]
 
 # Eliminadas las rutas de Mercado Pago 

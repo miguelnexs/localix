@@ -16,8 +16,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework import serializers
 
-from .models import Venta, ItemVenta, Cliente
-from .serializers import ClienteSerializer, VentaSerializer, VentaCreateSerializer, ItemVentaSerializer, ProductoVentaSerializer
+from .models import Venta, ItemVenta, Cliente, Reserva, ItemReserva, PagoReserva
+from .serializers import ClienteSerializer, VentaSerializer, VentaCreateSerializer, ItemVentaSerializer, ProductoVentaSerializer, ReservaSerializer, ReservaCreateSerializer, PagoReservaSerializer
 from productos.models import Producto, VarianteProducto, ColorProducto
 from django.db.models import Q
 # import mercadopago  # Eliminado
@@ -25,6 +25,7 @@ from django.conf import settings
 
 from rest_framework.decorators import api_view
 
+from pedidos.models import Pedido, ItemPedido
 
 
 class ClienteViewSet(viewsets.ModelViewSet):
@@ -335,10 +336,16 @@ class VentaViewSet(viewsets.ModelViewSet):
                 venta.calcular_totales()
 
                 # ✅ Crear pedido automáticamente después de la venta
-                from pedidos.models import Pedido, ItemPedido
-                
                 # Determinar tipo de venta basado en el método de pago
                 tipo_venta = 'fisica' if venta.metodo_pago in ['efectivo', 'tarjeta'] else 'digital'
+                
+                # Determinar estado del pedido basado en el método de pago
+                if venta.metodo_pago == 'separado':
+                    estado_pedido = 'separado'
+                    estado_pago = 'pendiente'
+                else:
+                    estado_pedido = 'pendiente'
+                    estado_pago = 'pagado' if venta.estado == 'completada' else 'pendiente'
                 
                 # Crear el pedido
                 pedido = Pedido.objects.create(
@@ -346,8 +353,8 @@ class VentaViewSet(viewsets.ModelViewSet):
                     cliente=cliente,
                     venta=venta,
                     tipo_venta=tipo_venta,
-                    estado_pago='pagado' if venta.estado == 'completada' else 'pendiente',
-                    estado_pedido='pendiente',
+                    estado_pago=estado_pago,
+                    estado_pedido=estado_pedido,
                     direccion_entrega=cliente.direccion if cliente else '',
                     telefono_contacto=cliente.telefono if cliente else '',
                     metodo_pago=venta.metodo_pago,
@@ -367,6 +374,20 @@ class VentaViewSet(viewsets.ModelViewSet):
                         subtotal=item_venta.subtotal,
                         color=item_venta.color  # Guardar el color seleccionado
                     )
+
+                # ✅ Crear estado inicial si el método de pago es 'separado'
+                if venta.metodo_pago == 'separado':
+                    from pedidos.models import EstadoPedido
+                    
+                    # Crear estado inicial del pedido
+                    EstadoPedido.objects.create(
+                        pedido=pedido,
+                        estado='separado',
+                        usuario=request.user,
+                        notas=f'Pedido creado con método de pago separado - Venta #{venta.id}'
+                    )
+                    
+                    # No crear abono inicial de $0.00 - los abonos se crearán cuando se registren pagos reales
 
                 # Serializar la venta completa
                 serializer = self.get_serializer(venta)
@@ -391,6 +412,168 @@ class VentaViewSet(viewsets.ModelViewSet):
                 'total_ingresos': total_ingresos
             }
         })
+
+
+class ReservaViewSet(viewsets.ModelViewSet):
+	queryset = Reserva.objects.select_related('cliente').prefetch_related('items__producto', 'pagos').order_by('-fecha_creacion')
+	serializer_class = ReservaSerializer
+
+	def get_queryset(self):
+		return Reserva.objects.filter(usuario=self.request.user).select_related('cliente').prefetch_related('items__producto', 'pagos').order_by('-fecha_creacion')
+
+	def perform_create(self, serializer):
+		serializer.save(usuario=self.request.user)
+
+	@action(detail=False, methods=['post'])
+	def crear(self, request):
+		"""Crear una reserva con items y abono opcional"""
+		data = request.data
+		serializer_in = ReservaCreateSerializer(data=data)
+		serializer_in.is_valid(raise_exception=True)
+		items = serializer_in.validated_data['items']
+		if not items:
+			return Response({'error': 'La reserva debe tener al menos un item'}, status=status.HTTP_400_BAD_REQUEST)
+		cliente = None
+		cliente_id = serializer_in.validated_data.get('cliente_id')
+		if cliente_id:
+			cliente = Cliente.objects.filter(id=cliente_id).first()
+		with transaction.atomic():
+			reserva = Reserva.objects.create(
+				usuario=request.user,
+				cliente=cliente,
+				fecha_vencimiento=serializer_in.validated_data.get('fecha_vencimiento'),
+				notas=serializer_in.validated_data.get('notas', '')
+			)
+			for item in items:
+				producto = Producto.objects.get(id=item['producto_id'])
+				variante = None
+				color = None
+				if item.get('variante_id'):
+					variante = VarianteProducto.objects.get(id=item['variante_id'])
+				if item.get('color_id'):
+					color = ColorProducto.objects.get(id=item['color_id'], producto=producto, activo=True)
+				ItemReserva.objects.create(
+					reserva=reserva,
+					producto=producto,
+					variante=variante,
+					color=color,
+					cantidad=item['cantidad'],
+					descuento_item=item.get('descuento_item', '0.00')
+				)
+			monto_deposito = Decimal(str(serializer_in.validated_data.get('monto_deposito', '0.00')))
+			if monto_deposito and monto_deposito > 0:
+				PagoReserva.objects.create(reserva=reserva, monto=monto_deposito, metodo='efectivo', usuario=request.user)
+			reserva.refresh_from_db()
+			# Crear Pedido asociado con estado 'separado'
+			pedido = Pedido.objects.create(
+				usuario=request.user,
+				cliente=cliente,
+				venta=None,
+				reserva=reserva,
+				tipo_venta='fisica',
+				estado_pago='pendiente',
+				estado_pedido='separado',
+				direccion_entrega=cliente.direccion if cliente else '',
+				telefono_contacto=cliente.telefono if cliente else '',
+				notas=f'Reserva #{reserva.id}',
+				metodo_pago='efectivo',
+				monto_abono=reserva.monto_deposito,
+				monto_pendiente=reserva.monto_pendiente,
+			)
+			# Items del pedido (precios referenciales)
+			for item in reserva.items.all():
+				precio_unitario = item.producto.precio
+				if item.variante:
+					precio_unitario += item.variante.precio_extra
+				ItemPedido.objects.create(
+					pedido=pedido,
+					producto=item.producto,
+					cantidad=item.cantidad,
+					precio_unitario=precio_unitario,
+					subtotal=item.subtotal,
+					color=item.color
+				)
+			return Response(ReservaSerializer(reserva).data, status=status.HTTP_201_CREATED)
+
+	@action(detail=True, methods=['post'])
+	def pago(self, request, pk=None):
+		reserva = self.get_object()
+		serializer = PagoReservaSerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		PagoReserva.objects.create(reserva=reserva, monto=serializer.validated_data['monto'], metodo=serializer.validated_data.get('metodo', 'efectivo'), usuario=request.user)
+		reserva.refresh_from_db()
+		# Actualizar pedido asociado si existe
+		if hasattr(reserva, 'pedido'):
+			pedido = reserva.pedido
+			pedido.monto_abono = reserva.monto_deposito
+			pedido.monto_pendiente = reserva.monto_pendiente
+			pedido.save(update_fields=['monto_abono', 'monto_pendiente'])
+		return Response(ReservaSerializer(reserva).data)
+
+	@action(detail=True, methods=['post'])
+	def cancelar(self, request, pk=None):
+		with transaction.atomic():
+			reserva = self.get_object()
+			# Liberar stock reservado
+			for item in reserva.items.select_related('variante', 'color'):
+				if item.color:
+					item.color.stock_reservado = max(0, item.color.stock_reservado - item.cantidad)
+					item.color.save(update_fields=['stock_reservado'])
+				elif item.variante:
+					item.variante.stock_reservado = max(0, item.variante.stock_reservado - item.cantidad)
+					item.variante.save(update_fields=['stock_reservado'])
+			reserva.estado = 'cancelada'
+			reserva.save(update_fields=['estado'])
+			# Actualizar pedido
+			if hasattr(reserva, 'pedido'):
+				pedido = reserva.pedido
+				pedido.estado_pedido = 'cancelado'
+				pedido.save(update_fields=['estado_pedido'])
+			return Response({'status': 'cancelada'})
+
+	@action(detail=True, methods=['post'])
+	def finalizar(self, request, pk=None):
+		"""Convertir reserva en venta: descuenta stock real, libera reservado"""
+		with transaction.atomic():
+			reserva = self.get_object()
+			if reserva.monto_pendiente > 0:
+				return Response({'error': 'La reserva aún tiene saldo pendiente'}, status=400)
+			# Crear venta
+			venta = Venta.objects.create(
+				usuario=request.user,
+				cliente=reserva.cliente,
+				estado='completada',
+				metodo_pago='efectivo',
+				observaciones=f'Conversión de reserva #{reserva.id}'
+			)
+			for item in reserva.items.select_related('producto', 'variante', 'color'):
+				ItemVenta.objects.create(
+					venta=venta,
+					producto=item.producto,
+					variante=item.variante,
+					color=item.color,
+					cantidad=item.cantidad,
+					descuento_item=item.descuento_item
+				)
+				# Liberar reservado
+				if item.color:
+					item.color.stock_reservado = max(0, item.color.stock_reservado - item.cantidad)
+					item.color.save(update_fields=['stock_reservado'])
+				elif item.variante:
+					item.variante.stock_reservado = max(0, item.variante.stock_reservado - item.cantidad)
+					item.variante.save(update_fields=['stock_reservado'])
+			venta.calcular_totales()
+			reserva.estado = 'completada'
+			reserva.save(update_fields=['estado'])
+			# Actualizar pedido a pagado/confirmado y vincular venta
+			if hasattr(reserva, 'pedido'):
+				pedido = reserva.pedido
+				pedido.venta = venta
+				pedido.estado_pago = 'pagado'
+				pedido.estado_pedido = 'confirmado'
+				pedido.monto_pendiente = 0
+				pedido.save(update_fields=['venta','estado_pago','estado_pedido','monto_pendiente'])
+			return Response(VentaSerializer(venta).data)
 
 # Vistas adicionales para productos (para la interfaz de DRF)
 class ProductoViewSet(viewsets.ReadOnlyModelViewSet):

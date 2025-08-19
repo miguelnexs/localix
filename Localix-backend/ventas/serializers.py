@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Cliente, Venta, ItemVenta
+from .models import Cliente, Venta, ItemVenta, Reserva, ItemReserva, PagoReserva
 from productos.models import Producto, VarianteProducto, ColorProducto
 
 class ClienteSerializer(serializers.ModelSerializer):
@@ -86,4 +86,43 @@ class VentaCreateSerializer(serializers.ModelSerializer):
             'cliente', 'cliente_nombre', 'estado', 'metodo_pago',
             'observaciones', 'vendedor', 'porcentaje_descuento', 'usuario'
         ]
-        read_only_fields = ['numero_venta', 'fecha_venta', 'subtotal', 'descuento', 'igv', 'total', 'usuario'] 
+        read_only_fields = ['numero_venta', 'fecha_venta', 'subtotal', 'descuento', 'igv', 'total', 'usuario']
+
+
+class ItemReservaWriteSerializer(serializers.Serializer):
+    producto_id = serializers.IntegerField()
+    variante_id = serializers.IntegerField(required=False, allow_null=True)
+    color_id = serializers.IntegerField(required=False, allow_null=True)
+    cantidad = serializers.IntegerField()
+    descuento_item = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default='0.00')
+
+class ItemReservaSerializer(serializers.ModelSerializer):
+    producto = serializers.StringRelatedField(read_only=True)
+    variante = serializers.StringRelatedField(read_only=True)
+    color = ColorProductoSerializer(read_only=True)
+
+    class Meta:
+        model = ItemReserva
+        fields = ['id', 'producto', 'variante', 'color', 'cantidad', 'descuento_item', 'subtotal']
+
+class PagoReservaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PagoReserva
+        fields = ['id', 'monto', 'fecha', 'metodo']
+
+class ReservaSerializer(serializers.ModelSerializer):
+    cliente = ClienteSerializer(read_only=True)
+    items = ItemReservaSerializer(many=True, read_only=True)
+    pagos = PagoReservaSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Reserva
+        fields = ['id', 'cliente', 'fecha_creacion', 'fecha_vencimiento', 'estado', 'monto_total', 'monto_deposito', 'monto_pendiente', 'notas', 'items', 'pagos']
+
+class ReservaCreateSerializer(serializers.Serializer):
+    cliente_id = serializers.IntegerField(required=False, allow_null=True)
+    cliente_nombre = serializers.CharField(required=False, allow_blank=True)
+    fecha_vencimiento = serializers.DateTimeField(required=False)
+    notas = serializers.CharField(required=False, allow_blank=True)
+    monto_deposito = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default='0.00')
+    items = ItemReservaWriteSerializer(many=True) 

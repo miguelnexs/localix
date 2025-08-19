@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Pedido, ItemPedido, HistorialPedido
+from django.db import models
+from .models import Pedido, ItemPedido, HistorialPedido, EstadoPedido, Abono
 from ventas.serializers import ClienteSerializer, VentaSerializer, ColorProductoSerializer
 from productos.serializers import ProductoSerializer
 
@@ -25,13 +26,43 @@ class HistorialPedidoSerializer(serializers.ModelSerializer):
         model = HistorialPedido
         fields = ['id', 'estado_anterior', 'estado_nuevo', 'fecha_cambio', 'notas', 'usuario_nombre']
 
+class EstadoPedidoSerializer(serializers.ModelSerializer):
+    usuario_nombre = serializers.CharField(source='usuario.username', read_only=True)
+    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    
+    class Meta:
+        model = EstadoPedido
+        fields = ['id', 'pedido', 'estado', 'estado_display', 'fecha_cambio', 'notas', 'usuario_nombre', 'activo']
+        read_only_fields = ['fecha_cambio']
+
+class AbonoSerializer(serializers.ModelSerializer):
+    usuario_nombre = serializers.CharField(source='usuario.username', read_only=True)
+    metodo_pago_display = serializers.CharField(source='get_metodo_pago_display', read_only=True)
+    estado_abono_display = serializers.CharField(source='get_estado_abono_display', read_only=True)
+    
+    class Meta:
+        model = Abono
+        fields = [
+            'id', 'pedido', 'monto', 'fecha_abono', 'metodo_pago', 'metodo_pago_display',
+            'referencia_pago', 'estado_abono', 'estado_abono_display', 'notas', 
+            'usuario_nombre', 'fecha_confirmacion', 'comprobante'
+        ]
+        read_only_fields = ['fecha_abono', 'fecha_confirmacion']
+
 class PedidoSerializer(serializers.ModelSerializer):
     cliente = ClienteSerializer(read_only=True)
     cliente_id = serializers.IntegerField(write_only=True)
     venta = VentaSerializer(read_only=True)
-    venta_id = serializers.IntegerField(write_only=True)
+    venta_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     items = ItemPedidoSerializer(many=True, read_only=True)
     historial = HistorialPedidoSerializer(many=True, read_only=True)
+    estados = EstadoPedidoSerializer(many=True, read_only=True)
+    abonos = AbonoSerializer(many=True, read_only=True)
+    estado_actual = serializers.SerializerMethodField()
+    total_abonado = serializers.SerializerMethodField()
+    abonos_detalle = serializers.SerializerMethodField()
+    monto_abono = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    monto_pendiente = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     
     # Campos calculados
     total_pedido = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
@@ -51,9 +82,32 @@ class PedidoSerializer(serializers.ModelSerializer):
             'telefono_contacto', 'instrucciones_entrega', 'fecha_creacion',
             'fecha_confirmacion', 'fecha_envio', 'fecha_entrega', 'notas',
             'metodo_pago', 'referencia_pago', 'codigo_seguimiento', 'empresa_envio',
-            'items', 'historial', 'total_pedido', 'productos_count'
+            'items', 'historial', 'estados', 'abonos', 'abonos_detalle', 'estado_actual', 'total_abonado',
+            'total_pedido', 'productos_count', 'monto_abono', 'monto_pendiente'
         ]
         read_only_fields = ['numero_pedido', 'fecha_creacion']
+    
+    def get_estado_actual(self, obj):
+        """Obtiene el estado actual activo del pedido"""
+        estado_actual = obj.estados.filter(activo=True).first()
+        if estado_actual:
+            return EstadoPedidoSerializer(estado_actual).data
+        return None
+    
+    def get_total_abonado(self, obj):
+        """Calcula el total de abonos confirmados"""
+        return sum(abono.monto for abono in obj.abonos.filter(estado_abono='confirmado'))
+    
+    def get_abonos_detalle(self, obj):
+        """Muestra información detallada de abonos cuando el pedido está separado"""
+        # Solo mostrar detalles si el pedido está separado
+        if obj.estado_pedido == 'separado':
+            # Filtrar abonos que tengan monto mayor a 0 o que estén confirmados
+            abonos = obj.abonos.filter(
+                models.Q(monto__gt=0) | models.Q(estado_abono='confirmado')
+            ).order_by('-fecha_abono')
+            return AbonoSerializer(abonos, many=True).data
+        return []
 
 class PedidoCreateSerializer(serializers.ModelSerializer):
     items = ItemPedidoSerializer(many=True)
@@ -107,4 +161,16 @@ class PedidoUpdateSerializer(serializers.ModelSerializer):
             )
         instance.estado_pedido = validated_data.get('estado_pedido', instance.estado_pedido)
         instance.save()
-        return instance 
+        return instance
+
+class AbonoCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Abono
+        fields = [
+            'pedido', 'monto', 'metodo_pago', 'referencia_pago', 
+            'estado_abono', 'notas', 'comprobante'
+        ]
+    
+    def create(self, validated_data):
+        validated_data['usuario'] = self.context['request'].user
+        return super().create(validated_data)

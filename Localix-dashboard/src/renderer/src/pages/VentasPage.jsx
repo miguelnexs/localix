@@ -4,7 +4,7 @@ import {
   ShoppingCart, Package, X, Plus, Minus, Save, Trash2, User, 
   Search, CreditCard, Truck, MapPin, Clock, Check, AlertCircle,
   Star, Eye, Filter, RefreshCw, ShoppingBag, Calculator, Percent,
-  Printer
+  Printer, Bookmark
 } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -39,6 +39,10 @@ const VentasPage = () => {
   const [precioEnvio, setPrecioEnvio] = useState(0);
   const [porcentajeDescuento, setPorcentajeDescuento] = useState(0);
   const [observaciones, setObservaciones] = useState('');
+  // Modo separado
+  const [modoSeparado, setModoSeparado] = useState(false);
+  const [depositoSeparado, setDepositoSeparado] = useState('0');
+  const [vencimientoSeparado, setVencimientoSeparado] = useState('');
   
   // Estados de búsqueda
   const [busquedaProducto, setBusquedaProducto] = useState('');
@@ -411,6 +415,46 @@ const VentasPage = () => {
     }
     setLoading(true);
     try {
+      if (modoSeparado) {
+        const reservaData = {
+          items: carrito.map(item => ({
+            producto_id: item.producto.id,
+            variante_id: item.variante?.id || null,
+            color_id: item.color?.id || null,
+            cantidad: item.cantidad,
+            descuento_item: 0
+          })),
+          monto_deposito: depositoSeparado || '0',
+          notas: observaciones,
+        };
+        if (clienteSeleccionado) {
+          reservaData.cliente_id = clienteSeleccionado.id;
+        }
+        if (vencimientoSeparado) {
+          reservaData.fecha_vencimiento = vencimientoSeparado;
+        }
+        const resReserva = await window.reservasAPI.crear(reservaData);
+        if (resReserva.success) {
+          setCarrito([]);
+          setDepositoSeparado('0');
+          setVencimientoSeparado('');
+          setModoSeparado(false);
+          toast.success('✅ Separado creado correctamente');
+          // Notificación en sidebar como pedido
+          addOrderNotification({
+            id: resReserva.data?.id,
+            numero_venta: `RES-${resReserva.data?.id}`,
+            total: resReserva.data?.monto_total,
+            cliente_nombre: clienteSeleccionado?.nombre || clienteNombre || 'Cliente',
+            items: (resReserva.data?.items || []).map(it => ({ producto: it.producto, cantidad: it.cantidad }))
+          });
+          cargarDatos();
+          return;
+        } else {
+          toast.error(resReserva.error || 'Error al crear separado');
+          return;
+        }
+      }
       const ventaData = {
         items: carrito.map(item => ({
           producto_id: item.producto.id,
@@ -474,6 +518,11 @@ const VentasPage = () => {
         
         cargarDatos();
         setModalVenta({ open: true, venta: response.data });
+        
+        // Redirigir a pedidos después de completar la venta
+        setTimeout(() => {
+          navigate('/orders');
+        }, 2000); // Esperar 2 segundos para que el usuario vea la confirmación
       } else {
         const errorMessage = response.error || 'Error al crear la venta.';
         toast.error(errorMessage);
@@ -867,38 +916,78 @@ const VentasPage = () => {
 
           {/* Botón de finalizar venta */}
           <div className="p-6 border-t border-theme-border bg-theme-background">
-            <div className="flex space-x-3">
-              <button
-                onClick={() => setMostrarConfigImpresora(true)}
-                className="px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
-                title="Configurar impresora"
-              >
-                <Printer className="w-4 h-4" />
-                Impresora
-              </button>
-              
-              <button
-                onClick={finalizarVenta}
-                disabled={loading || carrito.length === 0}
-                className="checkout-button flex-1 text-white py-3 px-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Procesando Venta...
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-5 h-5" />
-                    Finalizar Venta
-                    {carrito.length > 0 && (
-                      <span className="ml-2 px-2 py-1 bg-theme-surface/20 rounded-full text-sm">
-                        ${calcularTotal().toLocaleString()}
-                      </span>
-                    )}
-                  </>
+            <div className="flex flex-col gap-4">
+              {/* Toggle de Separado */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setModoSeparado(!modoSeparado)}
+                  className={`px-3 py-2 rounded-lg border ${modoSeparado ? 'bg-theme-accent text-white border-theme-accent' : 'bg-theme-surface text-theme-text border-theme-border'}`}
+                  title="Activar modo Separado"
+                >
+                  <Bookmark className="w-4 h-4 inline mr-2" />
+                  {modoSeparado ? 'Modo Separado activado' : 'Separar (reserva)'}
+                </button>
+                {modoSeparado && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div>
+                      <label className="block text-xs text-theme-textSecondary">Depósito</label>
+                      <input
+                        type="number"
+                        value={depositoSeparado}
+                        onChange={(e) => setDepositoSeparado(e.target.value)}
+                        className="px-3 py-2 border border-theme-border rounded-lg focus:ring-2 focus:ring-theme-accent focus:border-theme-accent text-sm w-32"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-theme-textSecondary">Vence</label>
+                      <input
+                        type="datetime-local"
+                        value={vencimientoSeparado}
+                        onChange={(e) => setVencimientoSeparado(e.target.value)}
+                        className="px-3 py-2 border border-theme-border rounded-lg focus:ring-2 focus:ring-theme-accent focus:border-theme-accent text-sm"
+                      />
+                    </div>
+                    <p className="text-xs text-theme-textSecondary">Stock se reserva, no se descuenta hasta finalizar.</p>
+                  </div>
                 )}
-              </button>
+              </div>
+              
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setMostrarConfigImpresora(true)}
+                  className="px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
+                  title="Configurar impresora"
+                >
+                  <Printer className="w-4 h-4" />
+                  Impresora
+                </button>
+                
+                <button
+                  onClick={finalizarVenta}
+                  disabled={loading || carrito.length === 0}
+                  className="checkout-button flex-1 text-white py-3 px-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      {modoSeparado ? 'Creando Separado...' : 'Procesando Venta...'}
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-5 h-5" />
+                      {modoSeparado ? 'Crear Separado' : 'Finalizar Venta'}
+                      {carrito.length > 0 && (
+                        <span className="ml-2 px-2 py-1 bg-theme-surface/20 rounded-full text-sm">
+                          ${calcularTotal().toLocaleString()}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -496,13 +496,23 @@ if (process.contextIsolated) {
 
 // 🚀 APIs DE VENTAS OPTIMIZADAS
 contextBridge.exposeInMainWorld('ventasAPI', {
-  obtenerProductos: () => optimizedInvoke('ventas:obtener-productos'),
-  buscarProductos: (query) => optimizedInvoke('ventas:buscar-productos', query),
-  obtenerClientes: () => optimizedInvoke('ventas:obtener-clientes'),
-  crearCliente: (clienteData) => optimizedInvoke('ventas:crear-cliente', clienteData),
-  crearVenta: (ventaData) => optimizedInvoke('ventas:crear-venta', ventaData),
-  obtenerVentas: () => optimizedInvoke('ventas:obtener-ventas'),
-  obtenerResumen: () => optimizedInvoke('ventas:obtener-resumen'),
+	obtenerProductos: () => optimizedInvoke('ventas:obtener-productos'),
+	buscarProductos: (query) => optimizedInvoke('ventas:buscar-productos', query),
+	obtenerClientes: () => optimizedInvoke('ventas:obtener-clientes'),
+	crearCliente: (clienteData) => optimizedInvoke('ventas:crear-cliente', clienteData),
+	crearVenta: (ventaData) => optimizedInvoke('ventas:crear-venta', ventaData),
+	obtenerVentas: () => optimizedInvoke('ventas:obtener-ventas'),
+	obtenerResumen: () => optimizedInvoke('ventas:obtener-resumen'),
+});
+
+// ✅ API de reservas
+contextBridge.exposeInMainWorld('reservasAPI', {
+	crear: (data) => optimizedInvoke('reservas:crear', data),
+	pago: (id, data) => optimizedInvoke('reservas:pago', id, data),
+	finalizar: (id) => optimizedInvoke('reservas:finalizar', id),
+	cancelar: (id) => optimizedInvoke('reservas:cancelar', id),
+	listar: () => optimizedInvoke('reservas:listar'),
+	obtener: (id) => optimizedInvoke('reservas:obtener', id),
 });
 
 // 🚀 APIs DE CLIENTES OPTIMIZADAS

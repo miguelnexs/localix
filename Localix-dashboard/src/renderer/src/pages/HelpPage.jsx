@@ -154,7 +154,7 @@ const resources = [
     title: 'Video Tutoriales',
     description: 'Aprende visualmente paso a paso',
     icon: Video,
-    color: 'bg-theme-accent bg-opacity-10 text-theme-accent',
+    color: 'bg-theme-accent/10 text-theme-accent',
     link: '#videos'
   },
   {
