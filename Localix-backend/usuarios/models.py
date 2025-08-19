@@ -1,6 +1,9 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
 
 class Usuario(AbstractUser):
     ROLES = [
@@ -39,3 +42,77 @@ class Usuario(AbstractUser):
     
     def get_short_name(self):
         return self.first_name or self.username
+
+class UserUsagePlan(models.Model):
+    PLAN_TYPES = [
+        ('trial', 'Prueba Gratuita'),
+        ('basic', 'Plan Básico'),
+        ('premium', 'Plan Premium'),
+        ('custom', 'Plan Personalizado'),
+    ]
+    
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='usage_plan')
+    plan_type = models.CharField(max_length=20, choices=PLAN_TYPES, default='trial')
+    days_allowed = models.IntegerField(default=15, help_text="Número de días permitidos de uso")
+    start_date = models.DateTimeField(auto_now_add=True, help_text="Fecha de inicio del plan")
+    end_date = models.DateTimeField(null=True, blank=True, help_text="Fecha de expiración del plan")
+    is_active = models.BooleanField(default=True, help_text="Si el plan está activo")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Plan de Uso de Usuario"
+        verbose_name_plural = "Planes de Uso de Usuarios"
+    
+    def save(self, *args, **kwargs):
+        # Calcular automáticamente la fecha de expiración
+        if not self.end_date:
+            if not self.start_date:
+                self.start_date = timezone.now()
+            self.end_date = self.start_date + timedelta(days=self.days_allowed)
+        super().save(*args, **kwargs)
+    
+    @property
+    def is_expired(self):
+        """Verifica si el plan ha expirado"""
+        if not self.end_date:
+            return False
+        return timezone.now() > self.end_date
+    
+    @property
+    def days_remaining(self):
+        """Calcula los días restantes"""
+        if not self.end_date:
+            return self.days_allowed
+        if self.is_expired:
+            return 0
+        remaining = self.end_date - timezone.now()
+        return max(0, remaining.days)
+    
+    @property
+    def usage_percentage(self):
+        """Calcula el porcentaje de uso consumido"""
+        if not self.end_date or not self.start_date:
+            return 0
+        total_days = (self.end_date - self.start_date).days
+        if total_days <= 0:
+            return 0
+        used_days = total_days - self.days_remaining
+        return min(100, (used_days / total_days) * 100)
+    
+    def extend_plan(self, additional_days):
+        """Extiende el plan con días adicionales"""
+        self.days_allowed += additional_days
+        self.end_date += timedelta(days=additional_days)
+        self.save()
+    
+    def reset_plan(self, new_days):
+        """Reinicia el plan con nuevos días"""
+        self.days_allowed = new_days
+        self.start_date = timezone.now()
+        self.end_date = self.start_date + timedelta(days=new_days)
+        self.is_active = True
+        self.save()
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.plan_type} ({self.days_remaining} días restantes)"

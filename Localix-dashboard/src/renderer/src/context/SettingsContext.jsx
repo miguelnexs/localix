@@ -89,20 +89,20 @@ const defaultSettings = {
   // Configuración de marca personalizada
   customBrand: {
     logo: null, // URL de la imagen del logo
-    companyName: 'Carolina González',
+    companyName: 'Localix',
     showLogo: true,
     showCompanyName: true
   },
   // Configuración de datos de empresa para PDFs
   companyData: {
-    nombre: 'Carolina González Sarta',
-    direccion: 'Cra 7 # 15 57 local 101',
-    telefono: '3147435305',
-    email: 'carolina.gonzalez@localix.com',
-    nit: '1088297299-0',
-    ruc: '1088297299-0',
-    web: 'www.carolinagonzalez.com',
-    ciudad: 'Bogotá',
+    nombre: 'Localix',
+    direccion: 'Calle 15 # 7-57 Local 101',
+    telefono: '(+57) 314 743 5305',
+    email: 'info@localix.com',
+    nit: '900.123.456-7',
+    ruc: '900.123.456-7',
+    web: 'www.localix.com',
+    ciudad: 'Pereira',
     pais: 'Colombia'
   }
 };

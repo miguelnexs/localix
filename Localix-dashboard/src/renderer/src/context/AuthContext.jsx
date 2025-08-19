@@ -304,7 +304,7 @@ export const AuthProvider = ({ children }) => {
         payload: { user, tokens },
       });
 
-      return { success: true };
+      return { success: true, tokens, user };
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Error en el login';
       dispatch({
@@ -369,6 +369,16 @@ export const AuthProvider = ({ children }) => {
   const clearError = () => {
     dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
   };
+
+  // Log de debugging para ver el estado actual
+  console.log('🔍 AuthContext - Estado actual:', {
+    isAuthenticated: state.isAuthenticated,
+    isLoading: state.isLoading,
+    user: state.user?.username,
+    hasAccessToken: !!state.tokens.access,
+    hasRefreshToken: !!state.tokens.refresh,
+    accessTokenLength: state.tokens.access?.length || 0
+  });
 
   const value = {
     ...state,

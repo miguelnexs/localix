@@ -194,7 +194,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
           {(!collapsed || isMobile) && customBrand.showCompanyName && (
             <div className="flex flex-col">
               <h1 className="text-lg font-bold tracking-tight text-white font-serif whitespace-nowrap">
-                {customBrand.companyName || 'Carolina González'}
+                {customBrand.companyName || 'Localix'}
               </h1>
               <p className="text-xs text-white/80 font-medium">Administradora</p>
             </div>

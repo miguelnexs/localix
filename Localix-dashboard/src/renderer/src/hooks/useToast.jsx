@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 
 export const useToast = () => {
-  const showToast = useCallback((type, title, message, options = {}) => {
-    if (window.toast) {
+  const showToast = useCallback((title, message, type = 'info', options = {}) => {
+    if (window.toast && typeof window.toast[type] === 'function') {
       return window.toast[type](title, message, options);
     }
     // Fallback a console si no hay toast disponible

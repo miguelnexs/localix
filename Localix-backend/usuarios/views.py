@@ -12,6 +12,12 @@ from .serializers import (
     LoginSerializer, UsuarioSerializer, UsuarioCreateSerializer,
     UsuarioUpdateSerializer, ChangePasswordSerializer
 )
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.http import JsonResponse
+from django.utils import timezone
+from .models import UserUsagePlan
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -245,3 +251,61 @@ class RefreshTokenView(APIView):
                 'message': 'Error al refrescar token',
                 'error': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
+
+@login_required
+def usage_expired(request):
+    """Vista para mostrar cuando el plan ha expirado"""
+    try:
+        usage_plan = UserUsagePlan.objects.get(user=request.user)
+        context = {
+            'usage_plan': usage_plan,
+            'days_expired': abs(usage_plan.days_remaining)
+        }
+    except UserUsagePlan.DoesNotExist:
+        context = {
+            'usage_plan': None,
+            'days_expired': 0
+        }
+    
+    return render(request, 'usuarios/usage_expired.html', context)
+
+class UsageStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        """API para obtener el estado del plan de uso"""
+        try:
+            usage_plan = UserUsagePlan.objects.get(user=request.user)
+            return Response({
+                'plan_type': usage_plan.plan_type,
+                'days_remaining': usage_plan.days_remaining,
+                'is_expired': usage_plan.is_expired,
+                'is_active': usage_plan.is_active,
+                'end_date': usage_plan.end_date.isoformat(),
+                'usage_percentage': usage_plan.usage_percentage
+            })
+        except UserUsagePlan.DoesNotExist:
+            return Response({
+                'error': 'No se encontró plan de uso'
+            }, status=404)
+
+@login_required
+def usage_dashboard(request):
+    """Vista del dashboard con información del plan"""
+    try:
+        usage_plan = UserUsagePlan.objects.get(user=request.user)
+        context = {
+            'usage_plan': usage_plan,
+            'days_remaining': usage_plan.days_remaining,
+            'is_expired': usage_plan.is_expired,
+            'usage_percentage': usage_plan.usage_percentage
+        }
+    except UserUsagePlan.DoesNotExist:
+        context = {
+            'usage_plan': None,
+            'days_remaining': 0,
+            'is_expired': False,
+            'usage_percentage': 0
+        }
+    
+    return render(request, 'usuarios/usage_dashboard.html', context)

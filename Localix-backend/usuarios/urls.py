@@ -16,4 +16,9 @@ urlpatterns = [
     path('usuarios/create/', views.UsuarioCreateView.as_view(), name='usuario_create'),
     path('usuarios/<int:pk>/', views.UsuarioDetailView.as_view(), name='usuario_detail'),
     path('usuarios/<int:user_id>/toggle-status/', views.toggle_user_status, name='toggle_user_status'),
+    
+    # URLs para gestión de uso
+    path('usage/expired/', views.usage_expired, name='usage_expired'),
+    path('usage/status/', views.UsageStatusView.as_view(), name='usage_status'),
+    path('usage/dashboard/', views.usage_dashboard, name='usage_dashboard'),
 ]

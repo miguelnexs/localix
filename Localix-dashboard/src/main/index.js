@@ -146,7 +146,7 @@ try {
         webSecurity: false, // Permitir carga de archivos locales
         allowRunningInsecureContent: true // Permitir contenido inseguro en desarrollo
       },
-      icon: path.join(__dirname, '..', 'resources', 'icon.png'),
+      icon: path.join(__dirname, '..', 'resources', 'localix-logo.png'),
       show: false,
       titleBarStyle: 'default',
       autoHideMenuBar: true

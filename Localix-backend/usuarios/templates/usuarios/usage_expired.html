@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plan Expirado - Localix</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        .icon {
+            width: 80px;
+            height: 80px;
+            background: #ff6b6b;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+            font-size: 40px;
+            color: white;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+        
+        .message {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .plan-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-left: 4px solid #ff6b6b;
+        }
+        
+        .plan-info h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .plan-info p {
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .contact-info {
+            background: #e3f2fd;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .contact-info h3 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+        
+        .contact-info p {
+            color: #424242;
+            margin-bottom: 5px;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .logout-btn {
+            background: #ff6b6b;
+            margin-left: 10px;
+        }
+        
+        .logout-btn:hover {
+            background: #ff5252;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">⚠️</div>
+        
+        <h1>Plan de Uso Expirado</h1>
+        
+        <div class="message">
+            {% if usage_plan.plan_type == 'trial' %}
+                Tu período de prueba gratuita ha finalizado. Para continuar utilizando Localix, 
+                necesitas adquirir un plan de pago.
+            {% elif usage_plan.plan_type == 'basic' %}
+                Tu plan básico ha finalizado. Para continuar utilizando Localix, 
+                necesitas renovar tu suscripción.
+            {% elif usage_plan.plan_type == 'premium' %}
+                Tu plan premium ha finalizado. Para continuar utilizando Localix, 
+                necesitas renovar tu suscripción.
+            {% else %}
+                Tu plan personalizado ha finalizado. Para continuar utilizando Localix, 
+                necesitas renovar tu suscripción.
+            {% endif %}
+        </div>
+        
+        {% if usage_plan %}
+        <div class="plan-info">
+            <h3>Información de tu Plan</h3>
+            <p><strong>Tipo de Plan:</strong> 
+                {% if usage_plan.plan_type == 'trial' %}
+                    🎁 Período de Prueba Gratuita
+                {% elif usage_plan.plan_type == 'basic' %}
+                    📦 Plan Básico
+                {% elif usage_plan.plan_type == 'premium' %}
+                    ⭐ Plan Premium
+                {% else %}
+                    🔧 Plan Personalizado
+                {% endif %}
+            </p>
+            <p><strong>Días Permitidos:</strong> {{ usage_plan.days_allowed }} días</p>
+            <p><strong>Fecha de Expiración:</strong> {{ usage_plan.end_date|date:"d/m/Y H:i" }}</p>
+            {% if days_expired > 0 %}
+            <p><strong>Días Expirados:</strong> {{ days_expired }} días</p>
+            {% endif %}
+            <p><strong>Estado:</strong> <span style="color: red; font-weight: bold;">EXPIRADO</span></p>
+        </div>
+        {% endif %}
+        
+        <div class="contact-info">
+            <h3>¿Necesitas Ayuda?</h3>
+            <p><strong>Email:</strong> info@localix.com</p>
+            <p><strong>Teléfono:</strong> (+57) 314 743 5305</p>
+            <p><strong>Horario:</strong> Lunes a Viernes 8:00 AM - 6:00 PM</p>
+        </div>
+        
+        <div>
+            <a href="mailto:info@localix.com" class="btn">Contactar Soporte</a>
+            <a href="{% url 'logout' %}" class="btn logout-btn">Cerrar Sesión</a>
+        </div>
+    </div>
+</body>
+</html>

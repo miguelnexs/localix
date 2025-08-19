@@ -20,14 +20,14 @@ export const getCompanyData = () => {
 // Función para obtener datos por defecto de la empresa
 export const getDefaultCompanyData = () => {
   return {
-    nombre: 'Carolina González Sarta',
-    direccion: 'Cra 7 # 15 57 local 101',
-    telefono: '3147435305',
-    email: 'carolina.gonzalez@localix.com',
-    nit: '1088297299-0',
-    ruc: '1088297299-0',
-    web: 'www.carolinagonzalez.com',
-    ciudad: 'Bogotá',
+    nombre: 'Localix',
+    direccion: 'Calle 15 # 7-57 Local 101',
+    telefono: '(+57) 314 743 5305',
+    email: 'info@localix.com',
+    nit: '900.123.456-7',
+    ruc: '900.123.456-7',
+    web: 'www.localix.com',
+    ciudad: 'Pereira',
     pais: 'Colombia'
   };
 };

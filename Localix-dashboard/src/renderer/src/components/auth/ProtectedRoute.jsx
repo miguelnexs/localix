@@ -1,18 +1,59 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { usePlanStatus } from '../../hooks/usePlanStatus';
+import { useToast } from '../../hooks/useToast';
+import PlanExpired from '../PlanExpired';
 
 const ProtectedRoute = ({ children, requiredRole = null }) => {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const { isActive, isExpired, isLoading: planLoading, planData, refreshPlanStatus } = usePlanStatus();
+  const { showToast } = useToast();
   const location = useLocation();
+  const [hasShownWarning, setHasShownWarning] = useState(false);
 
-  // Mostrar loading mientras se verifica la autenticación
-  if (isLoading) {
+  // Log de debugging
+  console.log('🛡️ ProtectedRoute - Estado actual:', {
+    isAuthenticated,
+    authLoading,
+    user: user?.username,
+    isActive,
+    isExpired,
+    planLoading,
+    planData: planData ? {
+      plan_type: planData.plan_type,
+      days_remaining: planData.days_remaining,
+      is_expired: planData.is_expired,
+      is_active: planData.is_active
+    } : null
+  });
+
+  // Mostrar advertencias de plan solo una vez por sesión
+  useEffect(() => {
+    if (!planLoading && isActive && planData && !hasShownWarning) {
+      // Mostrar advertencia si quedan pocos días
+      if (planData.days_remaining <= 3 && planData.days_remaining > 0) {
+        const warningMessage = planData.plan_type === 'trial' 
+          ? `⚠️ Tu período de prueba gratuita expira en ${planData.days_remaining} días. Considera adquirir un plan para continuar.`
+          : `⚠️ Tu plan expira en ${planData.days_remaining} días. Renueva tu suscripción para evitar interrupciones.`;
+        
+        setTimeout(() => {
+          showToast(warningMessage, 'warning');
+        }, 1000);
+        
+        setHasShownWarning(true);
+      }
+    }
+  }, [planLoading, isActive, planData, hasShownWarning, showToast]);
+
+  // Mostrar loading mientras se verifica la autenticación y el plan
+  if (authLoading || planLoading) {
+    console.log('🔄 ProtectedRoute - Mostrando loading...');
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Verificando autenticación...</p>
+          <div className="w-16 h-16 border-4 border-slate-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-700 font-medium">Verificando acceso...</p>
         </div>
       </div>
     );
@@ -20,11 +61,27 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
   // Si no está autenticado, redirigir al login
   if (!isAuthenticated) {
+    console.log('❌ ProtectedRoute - Usuario no autenticado, redirigiendo al login');
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Mostrar página de plan expirado si el plan no está activo
+  if (!isActive || isExpired) {
+    console.log('❌ ProtectedRoute - Plan inactivo o expirado, mostrando PlanExpired');
+    console.log('  - isActive:', isActive);
+    console.log('  - isExpired:', isExpired);
+    console.log('  - planData:', planData);
+    return (
+      <PlanExpired 
+        planData={planData}
+        onRefresh={refreshPlanStatus}
+      />
+    );
   }
 
   // Si se requiere un rol específico y el usuario no lo tiene
   if (requiredRole && user?.rol !== requiredRole && user?.rol !== 'admin') {
+    console.log('❌ ProtectedRoute - Rol requerido no encontrado');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -49,6 +106,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   }
 
   // Si todo está bien, mostrar el contenido
+  console.log('✅ ProtectedRoute - Acceso permitido, mostrando contenido');
   return children;
 };
 

@@ -6,7 +6,7 @@ Script para probar los endpoints de la API de Tienda
 import requests
 import json
 
-BASE_URL = "http://127.0.0.1:8001"
+BASE_URL = "http://127.0.0.1:8000"
 
 def test_endpoint(url, name):
     """Prueba un endpoint y muestra el resultado"""

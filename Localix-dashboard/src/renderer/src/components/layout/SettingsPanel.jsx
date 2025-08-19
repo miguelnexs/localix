@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useSettings } from '../../context/SettingsContext';
 import ImageUpload from '../ui/ImageUpload';
+import CompanySettings from '../settings/CompanySettings';
 
 const SettingsPanel = ({ isOpen, onClose }) => {
   const { 
@@ -257,7 +258,7 @@ const SettingsPanel = ({ isOpen, onClose }) => {
                       {settings.customBrand?.showCompanyName && (
                         <div className="flex flex-col">
                           <h1 className="text-lg font-bold tracking-tight text-white font-serif whitespace-nowrap">
-                            {settings.customBrand?.companyName || 'Carolina González'}
+                            {settings.customBrand?.companyName || 'Localix'}
                           </h1>
                           <p className="text-xs text-white/80 font-medium">Administradora</p>
                         </div>
@@ -270,192 +271,7 @@ const SettingsPanel = ({ isOpen, onClose }) => {
           )}
 
           {activeTab === 'company' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-theme-text mb-4">Datos de la Empresa</h3>
-                <p className="text-sm text-theme-textSecondary mb-6">
-                  Configura los datos que aparecerán en los recibos PDF y documentos oficiales
-                </p>
-                
-                {/* Información básica */}
-                <div className="space-y-4">
-                  <div className="p-4 bg-theme-secondary rounded-lg border border-theme-border">
-                    <h4 className="font-medium text-theme-text mb-3 flex items-center gap-2">
-                      <Building2 size={16} />
-                      Información Básica
-                    </h4>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-theme-text">
-                          Nombre de la empresa *
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.companyData?.nombre || ''}
-                          onChange={(e) => updateCompanyField('nombre', e.target.value)}
-                          placeholder="Nombre de la empresa"
-                          className="w-full px-3 py-2 bg-theme-surface border border-theme-border rounded-lg text-theme-text placeholder-theme-textSecondary focus:outline-none focus:ring-2 focus:ring-theme-accent focus:border-transparent"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-theme-text">
-                          Dirección *
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.companyData?.direccion || ''}
-                          onChange={(e) => updateCompanyField('direccion', e.target.value)}
-                          placeholder="Dirección completa"
-                          className="w-full px-3 py-2 bg-theme-surface border border-theme-border rounded-lg text-theme-text placeholder-theme-textSecondary focus:outline-none focus:ring-2 focus:ring-theme-accent focus:border-transparent"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-theme-text">
-                          Ciudad
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.companyData?.ciudad || ''}
-                          onChange={(e) => updateCompanyField('ciudad', e.target.value)}
-                          placeholder="Ciudad"
-                          className="w-full px-3 py-2 bg-theme-surface border border-theme-border rounded-lg text-theme-text placeholder-theme-textSecondary focus:outline-none focus:ring-2 focus:ring-theme-accent focus:border-transparent"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-theme-text">
-                          País
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.companyData?.pais || ''}
-                          onChange={(e) => updateCompanyField('pais', e.target.value)}
-                          placeholder="País"
-                          className="w-full px-3 py-2 bg-theme-surface border border-theme-border rounded-lg text-theme-text placeholder-theme-textSecondary focus:outline-none focus:ring-2 focus:ring-theme-accent focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Información de contacto */}
-                  <div className="p-4 bg-theme-secondary rounded-lg border border-theme-border">
-                    <h4 className="font-medium text-theme-text mb-3 flex items-center gap-2">
-                      <FileText size={16} />
-                      Información de Contacto
-                    </h4>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-theme-text">
-                          Teléfono *
-                        </label>
-                        <input
-                          type="tel"
-                          value={settings.companyData?.telefono || ''}
-                          onChange={(e) => updateCompanyField('telefono', e.target.value)}
-                          placeholder="Número de teléfono"
-                          className="w-full px-3 py-2 bg-theme-surface border border-theme-border rounded-lg text-theme-text placeholder-theme-textSecondary focus:outline-none focus:ring-2 focus:ring-theme-accent focus:border-transparent"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-theme-text">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          value={settings.companyData?.email || ''}
-                          onChange={(e) => updateCompanyField('email', e.target.value)}
-                          placeholder="correo@empresa.com"
-                          className="w-full px-3 py-2 bg-theme-surface border border-theme-border rounded-lg text-theme-text placeholder-theme-textSecondary focus:outline-none focus:ring-2 focus:ring-theme-accent focus:border-transparent"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-theme-text">
-                          Sitio web
-                        </label>
-                        <input
-                          type="url"
-                          value={settings.companyData?.web || ''}
-                          onChange={(e) => updateCompanyField('web', e.target.value)}
-                          placeholder="www.empresa.com"
-                          className="w-full px-3 py-2 bg-theme-surface border border-theme-border rounded-lg text-theme-text placeholder-theme-textSecondary focus:outline-none focus:ring-2 focus:ring-theme-accent focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Información fiscal */}
-                  <div className="p-4 bg-theme-secondary rounded-lg border border-theme-border">
-                    <h4 className="font-medium text-theme-text mb-3 flex items-center gap-2">
-                      <FileText size={16} />
-                      Información Fiscal
-                    </h4>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-theme-text">
-                          NIT *
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.companyData?.nit || ''}
-                          onChange={(e) => updateCompanyField('nit', e.target.value)}
-                          placeholder="Número de identificación tributaria"
-                          className="w-full px-3 py-2 bg-theme-surface border border-theme-border rounded-lg text-theme-text placeholder-theme-textSecondary focus:outline-none focus:ring-2 focus:ring-theme-accent focus:border-transparent"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-theme-text">
-                          RUC
-                        </label>
-                        <input
-                          type="text"
-                          value={settings.companyData?.ruc || ''}
-                          onChange={(e) => updateCompanyField('ruc', e.target.value)}
-                          placeholder="Registro único de contribuyentes"
-                          className="w-full px-3 py-2 bg-theme-surface border border-theme-border rounded-lg text-theme-text placeholder-theme-textSecondary focus:outline-none focus:ring-2 focus:ring-theme-accent focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Vista previa del PDF */}
-                <div className="p-4 bg-theme-secondary rounded-lg border border-theme-border">
-                  <h4 className="font-medium text-theme-text mb-3">Vista previa del encabezado PDF</h4>
-                  <div className="bg-white rounded-lg p-4 border border-theme-border">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-theme-accent/10 rounded-lg flex items-center justify-center">
-                        <Building2 size={20} className="text-theme-accent" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-bold text-lg text-gray-900">
-                          {settings.companyData?.nombre || 'Nombre de la empresa'}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          {settings.companyData?.direccion || 'Dirección de la empresa'}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {settings.companyData?.telefono || 'Teléfono'} | {settings.companyData?.nit || 'NIT'}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {settings.companyData?.email || 'Email de la empresa'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-xs text-theme-textSecondary mt-2">
-                    Esta información aparecerá en el encabezado de todos los recibos PDF generados
-                  </p>
-                </div>
-              </div>
-            </div>
+            <CompanySettings />
           )}
 
           {activeTab === 'interface' && (
