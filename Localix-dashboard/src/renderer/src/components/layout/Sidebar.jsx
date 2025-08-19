@@ -151,11 +151,9 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
       title: 'Sistema',
       items: [
         { 
-          path: '#', 
+          path: '/settings', 
           icon: Settings, 
-          label: 'Configuración',
-          onClick: () => setSettingsPanelOpen(true),
-          isButton: true
+          label: 'Configuración'
         },
         { path: '/help', icon: HelpCircle, label: 'Ayuda' }
       ]

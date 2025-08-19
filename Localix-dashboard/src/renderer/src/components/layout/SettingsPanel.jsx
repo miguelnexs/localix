@@ -18,10 +18,10 @@ import {
   Eye,
   EyeOff,
   Building2,
-  FileText
+  FileText,
+  Users
 } from 'lucide-react';
 import { useSettings } from '../../context/SettingsContext';
-import ImageUpload from '../ui/ImageUpload';
 
 const SettingsPanel = ({ isOpen, onClose }) => {
   const { 
@@ -31,21 +31,13 @@ const SettingsPanel = ({ isOpen, onClose }) => {
     updateTheme, 
     toggleNotifications, 
     toggleAnimations, 
-    toggleCompactMode,
-    updateLogo,
-    updateCompanyName,
-    toggleLogoVisibility,
-    toggleCompanyNameVisibility,
-    updateCompanyField,
-    resetSettings 
+    toggleCompactMode
   } = useSettings();
 
   const [activeTab, setActiveTab] = useState('themes');
 
   const tabs = [
     { id: 'themes', label: 'Temas', icon: Palette },
-    { id: 'brand', label: 'Marca', icon: Image },
-    { id: 'company', label: 'Empresa', icon: Building2 },
     { id: 'interface', label: 'Interfaz', icon: Settings },
     { id: 'notifications', label: 'Notificaciones', icon: Bell },
   ];
@@ -516,7 +508,7 @@ const SettingsPanel = ({ isOpen, onClose }) => {
             </div>
           )}
 
-          {activeTab === 'notifications' && (
+                      {activeTab === 'notifications' && (
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-semibold text-theme-text mb-4">Configuración de Notificaciones</h3>

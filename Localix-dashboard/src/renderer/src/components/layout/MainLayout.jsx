@@ -4,6 +4,7 @@ import Sidebar from './Sidebar';
 import { Outlet } from 'react-router-dom';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useSettings } from '../../context/SettingsContext';
+import QuickSettingsButton from './QuickSettingsButton';
 
 const MainLayout = ({ children }) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -70,14 +71,17 @@ const MainLayout = ({ children }) => {
         {isMobile && (
           <div className="lg:hidden bg-theme-surface border-b border-theme-border px-4 py-3 flex items-center justify-between sticky top-0 z-10">
             <h1 className="text-lg font-semibold text-theme-text">Dashboard</h1>
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="p-2 rounded-md text-theme-textSecondary hover:text-theme-text hover:bg-theme-primary"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-2">
+              <QuickSettingsButton />
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="p-2 rounded-md text-theme-textSecondary hover:text-theme-text hover:bg-theme-primary"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
 
