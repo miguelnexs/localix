@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import psycopg2  # ← AGREGAR ESTA LÍNEA
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -80,8 +81,8 @@ WSGI_APPLICATION = 'Backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'tiendadb',
-        'USER': 'productos',
+        'NAME': 'localix',
+        'USER': 'localix_user',
         'PASSWORD': 'migel1457',
         'HOST': 'localhost',
         'PORT': '5432',

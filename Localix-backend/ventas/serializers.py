@@ -14,7 +14,7 @@ class ClienteSerializer(serializers.ModelSerializer):
 class ProductoVentaSerializer(serializers.ModelSerializer):
     categoria = serializers.StringRelatedField(read_only=True)
     imagen_principal_url = serializers.SerializerMethodField()
-    colores_disponibles = serializers.SerializerMethodField()
+    colores_disponibles = serializers.SerializerMethodField()  # hola
     
     class Meta:
         model = Producto
@@ -88,27 +88,42 @@ class VentaCreateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['numero_venta', 'fecha_venta', 'subtotal', 'descuento', 'igv', 'total', 'usuario']
 
-
-class ItemReservaWriteSerializer(serializers.Serializer):
-    producto_id = serializers.IntegerField()
-    variante_id = serializers.IntegerField(required=False, allow_null=True)
-    color_id = serializers.IntegerField(required=False, allow_null=True)
-    cantidad = serializers.IntegerField()
-    descuento_item = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default='0.00')
-
+# Serializers para Reservas
 class ItemReservaSerializer(serializers.ModelSerializer):
     producto = serializers.StringRelatedField(read_only=True)
+    producto_detalle = serializers.SerializerMethodField()
     variante = serializers.StringRelatedField(read_only=True)
     color = ColorProductoSerializer(read_only=True)
+    precio_unitario = serializers.SerializerMethodField()
 
     class Meta:
         model = ItemReserva
-        fields = ['id', 'producto', 'variante', 'color', 'cantidad', 'descuento_item', 'subtotal']
+        fields = [
+            'id', 'producto', 'producto_detalle', 'variante', 'color', 'cantidad',
+            'precio_unitario', 'descuento_item', 'subtotal'
+        ]
+
+    def get_producto_detalle(self, obj):
+        if obj.producto:
+            return {
+                'id': obj.producto.id,
+                'nombre': obj.producto.nombre,
+                'precio': str(obj.producto.precio),
+                'costo': str(obj.producto.costo),
+                'margen_ganancia': str(obj.producto.margen_ganancia)
+            }
+        return None
+
+    def get_precio_unitario(self, obj):
+        if obj.producto:
+            return obj.producto.precio
+        return 0
 
 class PagoReservaSerializer(serializers.ModelSerializer):
     class Meta:
         model = PagoReserva
-        fields = ['id', 'monto', 'fecha', 'metodo']
+        fields = ['id', 'monto', 'fecha', 'metodo', 'usuario']
+        read_only_fields = ['usuario', 'fecha']
 
 class ReservaSerializer(serializers.ModelSerializer):
     cliente = ClienteSerializer(read_only=True)
@@ -117,12 +132,17 @@ class ReservaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Reserva
-        fields = ['id', 'cliente', 'fecha_creacion', 'fecha_vencimiento', 'estado', 'monto_total', 'monto_deposito', 'monto_pendiente', 'notas', 'items', 'pagos']
+        fields = [
+            'id', 'cliente', 'fecha_creacion', 'fecha_vencimiento', 'estado',
+            'monto_total', 'monto_deposito', 'monto_pendiente', 'notas',
+            'items', 'pagos', 'usuario'
+        ]
+        read_only_fields = ['usuario', 'monto_total', 'monto_deposito', 'monto_pendiente']
 
-class ReservaCreateSerializer(serializers.Serializer):
-    cliente_id = serializers.IntegerField(required=False, allow_null=True)
-    cliente_nombre = serializers.CharField(required=False, allow_blank=True)
-    fecha_vencimiento = serializers.DateTimeField(required=False)
-    notas = serializers.CharField(required=False, allow_blank=True)
-    monto_deposito = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default='0.00')
-    items = ItemReservaWriteSerializer(many=True) 
+class ReservaCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Reserva
+        fields = [
+            'cliente', 'fecha_vencimiento', 'estado', 'notas', 'usuario'
+        ]
+        read_only_fields = ['usuario', 'monto_total', 'monto_deposito', 'monto_pendiente']
