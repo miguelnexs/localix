@@ -13,7 +13,7 @@ from typing import List, Dict, Any, Optional
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import serializers
 
 from .models import Venta, ItemVenta, Cliente, Reserva, ItemReserva, PagoReserva
@@ -578,11 +578,20 @@ class ReservaViewSet(viewsets.ModelViewSet):
 # Vistas adicionales para productos (para la interfaz de DRF)
 class ProductoViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    ViewSet para productos en ventas
+    ViewSet para productos en ventas - Filtra por usuario autenticado
     """
     queryset = Producto.objects.filter(estado='publicado').select_related('categoria').prefetch_related('variantes')
     serializer_class = ProductoVentaSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """
+        Filtra productos por usuario autenticado
+        """
+        return Producto.objects.filter(
+            usuario=self.request.user,
+            estado='publicado'
+        ).select_related('categoria').prefetch_related('variantes')
     
     def list(self, request):
         """Listar productos con información completa"""
@@ -592,12 +601,12 @@ class ProductoViewSet(viewsets.ReadOnlyModelViewSet):
     
     @action(detail=False, methods=['get'])
     def buscar(self, request):
-        """Buscar productos por nombre o SKU"""
+        """Buscar productos por nombre o SKU - Solo del usuario autenticado"""
         query = request.query_params.get('q', '').strip()
         if not query:
             return Response({'error': 'Query parameter required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        productos = self.queryset.filter(
+        productos = self.get_queryset().filter(
             Q(nombre__icontains=query) |  # type: ignore[operator]
             Q(sku__icontains=query)  # type: ignore[operator]
         ).select_related('categoria')[:10]  # type: ignore[attr-defined]
