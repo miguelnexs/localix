@@ -398,12 +398,15 @@ class VentaViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def resumen(self, request):
-        """Obtener resumen de ventas"""
-        ventas = self.get_queryset()[:20]
+        """Obtener resumen de ventas del usuario autenticado"""
+        # Usar get_queryset() que ya filtra por usuario
+        user_ventas = self.get_queryset()
+        ventas = user_ventas[:20]
         serializer = self.get_serializer(ventas, many=True)
         
-        total_ventas = ventas.count()
-        total_ingresos = sum(float(venta.total) for venta in ventas)
+        # Calcular totales solo para el usuario autenticado
+        total_ventas = user_ventas.count()
+        total_ingresos = sum(float(venta.total) for venta in user_ventas)
         
         return Response({
             'ventas': serializer.data,

@@ -143,10 +143,10 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8080",
     "http://localhost:5173",  # Vite por defecto
     "http://127.0.0.1:5173",
-    "http://72.60.7.133",  # IP del servidor VPS
-    "https://72.60.7.133",  # IP del servidor VPS con HTTPS
-    "http://www.72.60.7.133",
-    "https://www.72.60.7.133",
+    "http://softwarebycg.shop",  # Nueva URL principal
+    "https://softwarebycg.shop",  # Nueva URL principal con HTTPS
+    "http://www.softwarebycg.shop",
+    "https://www.softwarebycg.shop",
 ]
 CORS_ALLOW_METHODS = [
     'DELETE',
