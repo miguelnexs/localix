@@ -30,7 +30,7 @@ class CategoriaViewSet(viewsets.ModelViewSet):
         """
         Permite acceso público para listar y obtener categorías cuando se solicita publicos=true
         """
-        if self.action in ['list', 'retrieve'] and self.request.query_params.get('publicos') == 'true':
+        if self.action in ['list', 'retrieve'] and self.request.GET.get('publicos') == 'true':
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
     
@@ -39,7 +39,7 @@ class CategoriaViewSet(viewsets.ModelViewSet):
         Filtra las categorías por usuario autenticado o permite acceso público
         """
         # Si se solicita acceso público
-        if self.request.query_params.get('publicos') == 'true':
+        if self.request.GET.get('publicos') == 'true':
             # Filtrar solo categorías del usuario admin
             from django.contrib.auth import get_user_model
             User = get_user_model()
