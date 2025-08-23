@@ -558,6 +558,52 @@ class ProductoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=False, methods=['POST'])
+    def reorder(self, request):
+        """
+        Reordenar productos actualizando su fecha de creación para simular orden
+        """
+        try:
+            productos_data = request.data.get('productos', [])
+            
+            if not isinstance(productos_data, list):
+                return Response(
+                    {'error': 'El campo productos debe ser una lista'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Usar transacción para asegurar consistencia
+            from django.db import transaction
+            with transaction.atomic():
+                # Obtener la fecha base más reciente
+                from django.utils import timezone
+                import datetime
+                base_time = timezone.now()
+                
+                for index, item in enumerate(productos_data):
+                    producto_id = item.get('id')
+                    if producto_id:
+                        try:
+                            producto = Producto.objects.get(
+                                id=producto_id, 
+                                usuario=request.user
+                            )
+                            # Actualizar fecha_creacion para simular orden
+                            # Los productos con menor índice tendrán fechas más recientes
+                            new_time = base_time + datetime.timedelta(seconds=len(productos_data) - index)
+                            producto.fecha_creacion = new_time
+                            producto.save(update_fields=['fecha_creacion'])
+                        except Producto.DoesNotExist:
+                            continue
+            
+            return Response({'message': 'Productos reordenados correctamente'})
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     def perform_create(self, serializer):
         """
         Crear producto y asignar usuario
