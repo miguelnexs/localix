@@ -35,7 +35,7 @@
     "chart.js": "^4.4.9",
     "electron-store": "^10.1.0",
     "electron-updater": "^6.3.9",
-    "form-data": "^4.0.3",
+    "form-data": "^4.0.4",
     "formik": "^2.4.6",
     "framer-motion": "^12.7.4",
     "graphql": "^16.11.0",
